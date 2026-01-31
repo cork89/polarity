@@ -5,10 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Polarity Game</title>
     <style>
+        :root {
+            --bg-color: #222;
+            --text-color: #fff;
+            --border-color: #555;
+            --canvas-bg: #5a4a3a;
+            --key-bg: #444;
+            --key-bg-hover: #555;
+            --accent-color: #6666ff;
+        }
+
         body {
             margin: 0;
             padding: 0;
-            background: #222;
+            background: var(--bg-color);
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -17,24 +27,24 @@
             font-family: Arial, sans-serif;
         }
         canvas {
-            border: 2px solid #555;
-            background: #5a4a3a;
+            border: 2px solid var(--border-color);
+            background: var(--canvas-bg);
         }
         .instructions {
-            color: #fff;
+            color: var(--text-color);
             margin-top: 10px;
             text-align: center;
         }
         .key {
             display: inline-block;
-            background: #444;
+            background: var(--key-bg);
             padding: 5px 10px;
             border-radius: 4px;
             margin: 0 5px;
             font-weight: bold;
         }
         .score {
-            color: #fff;
+            color: var(--text-color);
             font-size: 24px;
             margin-bottom: 10px;
         }
@@ -47,27 +57,27 @@
         .level-select {
             padding: 8px 12px;
             font-size: 14px;
-            background: #444;
-            color: #fff;
-            border: 2px solid #555;
+            background: var(--key-bg);
+            color: var(--text-color);
+            border: 2px solid var(--border-color);
             border-radius: 4px;
             cursor: pointer;
         }
         .level-select:hover {
-            background: #555;
+            background: var(--key-bg-hover);
         }
         .editor-link {
-            color: #6666ff;
+            color: var(--accent-color);
             text-decoration: none;
             font-size: 14px;
             padding: 8px 12px;
-            border: 2px solid #6666ff;
+            border: 2px solid var(--accent-color);
             border-radius: 4px;
             transition: all 0.2s;
         }
         .editor-link:hover {
-            background: #6666ff;
-            color: #fff;
+            background: var(--accent-color);
+            color: var(--text-color);
         }
     </style>
 </head>

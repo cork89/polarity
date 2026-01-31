@@ -12,7 +12,25 @@ const CELL_SIZE = canvas.width / GRID_SIZE;
 const PLAYER_SIZE = 40;
 const TARGET_SIZE = 35;
 const ATTRACTOR_SIZE = 35;
-const GRAVITY = 0.3;
+const GRAVITY = 0.1;
+
+// Colors
+const COLOR_BACKGROUND = "#5a4a3a";
+const COLOR_GRID = "#6a5a4a";
+const COLOR_PLAYER_OUTER = "#666";
+const COLOR_PLAYER_INNER = "#7d7d7dff";
+const COLOR_PLAYER_TRAIL = "rgba(150, 150, 150, 0.3)";
+const COLOR_RED_ATTRACTOR_OUTER = "#c44444";
+const COLOR_RED_ATTRACTOR_INNER = "#ff6666";
+const COLOR_BLUE_ATTRACTOR_OUTER = "#4444c4";
+const COLOR_BLUE_ATTRACTOR_INNER = "#6666ff";
+const COLOR_TARGET_OUTER = "#4CAF50";
+const COLOR_TARGET_INNER = "#66ff66";
+const COLOR_TARGET_PARTICLE = "#4CAF50";
+const COLOR_WALL_OUTER = "#aaaaaa";
+const COLOR_WALL_INNER = "#cccccc";
+const COLOR_ATTRACTION_LINE_RED = "rgba(255, 100, 100, 0.3)";
+const COLOR_ATTRACTION_LINE_BLUE = "rgba(100, 100, 255, 0.3)";
 
 // Level data interface (new compact grid format)
 interface LevelData {
@@ -47,6 +65,11 @@ interface Target {
   collected: boolean;
 }
 
+interface Wall {
+  x: number;
+  y: number;
+}
+
 interface Player {
   x: number;
   y: number;
@@ -79,6 +102,9 @@ let blueAttractors: Attractor[] = [];
 // Targets (green squares)
 let targets: Target[] = [];
 
+// Walls (impassable barriers)
+let walls: Wall[] = [];
+
 // Current level info
 let currentLevelName: string | null = null;
 
@@ -97,6 +123,7 @@ function parseGrid(grid: string[][]) {
   const reds: Attractor[] = [];
   const blues: Attractor[] = [];
   const targs: Target[] = [];
+  const wallList: Wall[] = [];
   
   for (let y = 0; y < GRID_SIZE; y++) {
     const row = grid[y];
@@ -117,11 +144,14 @@ function parseGrid(grid: string[][]) {
         case "T":
           targs.push({ ...gridToPixel(x, y), collected: false });
           break;
+        case "W":
+          wallList.push({ x: x * CELL_SIZE, y: y * CELL_SIZE });
+          break;
       }
     }
   }
   
-  return { playerX, playerY, reds, blues, targs };
+  return { playerX, playerY, reds, blues, targs, wallList };
 }
 
 // Load level from data
@@ -138,17 +168,18 @@ function loadLevel(levelData: LevelData) {
   player.hasAttracted = false;
 
   // Parse the grid
-  const { playerX, playerY, reds, blues, targs } = parseGrid(levelData.grid);
+  const { playerX, playerY, reds, blues, targs, wallList } = parseGrid(levelData.grid);
 
   // Set player position
   const playerOffset = (CELL_SIZE - PLAYER_SIZE) / 2;
   player.x = playerX * CELL_SIZE + playerOffset;
   player.y = playerY * CELL_SIZE + playerOffset;
 
-  // Load attractors and targets
+  // Load attractors, targets, and walls
   redAttractors = reds;
   blueAttractors = blues;
   targets = targs;
+  walls = wallList;
 
   currentLevelName = levelData.name;
 }
@@ -355,6 +386,41 @@ function updatePlayer() {
     player.vy = 0;
   }
 
+  // Wall collision - stop player from passing through walls
+  walls.forEach((wall) => {
+    // Check if player intersects with wall
+    if (
+      player.x < wall.x + CELL_SIZE &&
+      player.x + player.size > wall.x &&
+      player.y < wall.y + CELL_SIZE &&
+      player.y + player.size > wall.y
+    ) {
+      // Determine which side of the wall the player hit
+      const overlapLeft = (player.x + player.size) - wall.x;
+      const overlapRight = (wall.x + CELL_SIZE) - player.x;
+      const overlapTop = (player.y + player.size) - wall.y;
+      const overlapBottom = (wall.y + CELL_SIZE) - player.y;
+
+      // Find the smallest overlap
+      const minOverlap = Math.min(overlapLeft, overlapRight, overlapTop, overlapBottom);
+
+      // Push player out based on smallest overlap
+      if (minOverlap === overlapLeft) {
+        player.x = wall.x - player.size;
+        player.vx = 0;
+      } else if (minOverlap === overlapRight) {
+        player.x = wall.x + CELL_SIZE;
+        player.vx = 0;
+      } else if (minOverlap === overlapTop) {
+        player.y = wall.y - player.size;
+        player.vy = 0;
+      } else if (minOverlap === overlapBottom) {
+        player.y = wall.y + CELL_SIZE;
+        player.vy = 0;
+      }
+    }
+  });
+
   // Trail effect
   player.trail.push({ x: player.x, y: player.y, alpha: 1 });
   if (player.trail.length > 20) player.trail.shift();
@@ -384,7 +450,7 @@ function checkCollisions() {
             vx: (Math.random() - 0.5) * 5,
             vy: (Math.random() - 0.5) * 5,
             life: 1,
-            color: "#4CAF50",
+            color: COLOR_TARGET_PARTICLE,
           });
         }
       }
@@ -411,7 +477,7 @@ function updateParticles() {
 
 // Drawing functions
 function drawGrid() {
-  ctx.strokeStyle = "#6a5a4a";
+  ctx.strokeStyle = COLOR_GRID;
   ctx.lineWidth = 2;
 
   for (let i = 0; i <= GRID_SIZE; i++) {
@@ -429,35 +495,45 @@ function drawGrid() {
 
 function drawAttractors() {
   // Red attractors
-  ctx.fillStyle = "#c44444";
+  ctx.fillStyle = COLOR_RED_ATTRACTOR_OUTER;
   redAttractors.forEach((a) => {
     ctx.fillRect(a.x, a.y, ATTRACTOR_SIZE, ATTRACTOR_SIZE);
     // Inner detail
-    ctx.fillStyle = "#ff6666";
+    ctx.fillStyle = COLOR_RED_ATTRACTOR_INNER;
     ctx.fillRect(a.x + 5, a.y + 5, ATTRACTOR_SIZE - 10, ATTRACTOR_SIZE - 10);
-    ctx.fillStyle = "#c44444";
+    ctx.fillStyle = COLOR_RED_ATTRACTOR_OUTER;
   });
 
   // Blue attractors
-  ctx.fillStyle = "#4444c4";
+  ctx.fillStyle = COLOR_BLUE_ATTRACTOR_OUTER;
   blueAttractors.forEach((a) => {
     ctx.fillRect(a.x, a.y, ATTRACTOR_SIZE, ATTRACTOR_SIZE);
     // Inner detail
-    ctx.fillStyle = "#6666ff";
+    ctx.fillStyle = COLOR_BLUE_ATTRACTOR_INNER;
     ctx.fillRect(a.x + 5, a.y + 5, ATTRACTOR_SIZE - 10, ATTRACTOR_SIZE - 10);
-    ctx.fillStyle = "#4444c4";
+    ctx.fillStyle = COLOR_BLUE_ATTRACTOR_OUTER;
   });
 }
 
 function drawTargets() {
   targets.forEach((t) => {
     if (!t.collected) {
-      ctx.fillStyle = "#4CAF50";
+      ctx.fillStyle = COLOR_TARGET_OUTER;
       ctx.fillRect(t.x, t.y, TARGET_SIZE, TARGET_SIZE);
       // Inner detail
-      ctx.fillStyle = "#66ff66";
+      ctx.fillStyle = COLOR_TARGET_INNER;
       ctx.fillRect(t.x + 5, t.y + 5, TARGET_SIZE - 10, TARGET_SIZE - 10);
     }
+  });
+}
+
+function drawWalls() {
+  walls.forEach((w) => {
+    ctx.fillStyle = COLOR_WALL_OUTER;
+    ctx.fillRect(w.x, w.y, CELL_SIZE, CELL_SIZE);
+    // Inner detail
+    ctx.fillStyle = COLOR_WALL_INNER;
+    ctx.fillRect(w.x + 2, w.y + 2, CELL_SIZE - 4, CELL_SIZE - 4);
   });
 }
 
@@ -469,11 +545,11 @@ function drawPlayer() {
   });
 
   // Draw player
-  ctx.fillStyle = "#4444c4";
+  ctx.fillStyle = COLOR_PLAYER_OUTER;
   ctx.fillRect(player.x, player.y, player.size, player.size);
 
   // Player inner detail
-  ctx.fillStyle = "#6666ff";
+  ctx.fillStyle = COLOR_PLAYER_INNER;
   ctx.fillRect(player.x + 5, player.y + 5, player.size - 10, player.size - 10);
 }
 
@@ -489,7 +565,7 @@ function drawParticles() {
 function drawAttractionLines() {
   if (keys.x) {
     redAttractors.forEach((a) => {
-      ctx.strokeStyle = "rgba(255, 100, 100, 0.3)";
+      ctx.strokeStyle = COLOR_ATTRACTION_LINE_RED;
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(player.x + player.size / 2, player.y + player.size / 2);
@@ -499,7 +575,7 @@ function drawAttractionLines() {
   }
   if (keys.z) {
     blueAttractors.forEach((a) => {
-      ctx.strokeStyle = "rgba(100, 100, 255, 0.3)";
+      ctx.strokeStyle = COLOR_ATTRACTION_LINE_BLUE;
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(player.x + player.size / 2, player.y + player.size / 2);
@@ -512,7 +588,7 @@ function drawAttractionLines() {
 // Main game loop
 function gameLoop() {
   // Clear canvas
-  ctx.fillStyle = "#5a4a3a";
+  ctx.fillStyle = COLOR_BACKGROUND;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   // Draw grid
@@ -525,6 +601,7 @@ function gameLoop() {
   updateParticles();
 
   // Draw everything
+  drawWalls();
   drawAttractionLines();
   drawAttractors();
   drawTargets();

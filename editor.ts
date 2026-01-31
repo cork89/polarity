@@ -8,16 +8,17 @@ const GRID_SIZE = 6;
 const CELL_SIZE = canvas.width / GRID_SIZE;
 
 // Tool types
-type Tool = "player" | "red" | "blue" | "target" | "eraser";
+type Tool = "player" | "red" | "blue" | "target" | "wall" | "eraser";
 let currentTool: Tool = "player";
 
 // Letter mapping for grid cells
-type GridCell = " " | "P" | "R" | "B" | "T";
+type GridCell = " " | "P" | "R" | "B" | "T" | "W";
 const TOOL_TO_LETTER: Record<Tool, GridCell> = {
   player: "P",
   red: "R",
   blue: "B",
   target: "T",
+  wall: "W",
   eraser: " ",
 };
 const LETTER_TO_TOOL: Record<GridCell, Tool | null> = {
@@ -26,6 +27,7 @@ const LETTER_TO_TOOL: Record<GridCell, Tool | null> = {
   "R": "red",
   "B": "blue",
   "T": "target",
+  "W": "wall",
 };
 
 // Level data structure (new compact format)
@@ -170,6 +172,13 @@ function drawTarget(gridX: number, gridY: number) {
   ctx.fillRect(pos.x + 5, pos.y + 5, 25, 25);
 }
 
+function drawWall(gridX: number, gridY: number) {
+  ctx.fillStyle = "#aaaaaa";
+  ctx.fillRect(gridX * CELL_SIZE, gridY * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+  ctx.fillStyle = "#cccccc";
+  ctx.fillRect(gridX * CELL_SIZE + 2, gridY * CELL_SIZE + 2, CELL_SIZE - 4, CELL_SIZE - 4);
+}
+
 function drawGridContents() {
   for (let y = 0; y < GRID_SIZE; y++) {
     const row = currentLevel.grid[y];
@@ -188,6 +197,9 @@ function drawGridContents() {
           break;
         case "T":
           drawTarget(x, y);
+          break;
+        case "W":
+          drawWall(x, y);
           break;
       }
     }
@@ -245,8 +257,8 @@ document.querySelectorAll(".tool-btn").forEach(btn => {
 });
 
 // Count objects in grid
-function countObjects(): { red: number; blue: number; targets: number } {
-  let red = 0, blue = 0, targets = 0;
+function countObjects(): { red: number; blue: number; targets: number; walls: number } {
+  let red = 0, blue = 0, targets = 0, walls = 0;
   for (let y = 0; y < GRID_SIZE; y++) {
     const row = currentLevel.grid[y];
     if (!row) continue;
@@ -255,9 +267,10 @@ function countObjects(): { red: number; blue: number; targets: number } {
       if (cell === "R") red++;
       if (cell === "B") blue++;
       if (cell === "T") targets++;
+      if (cell === "W") walls++;
     }
   }
-  return { red, blue, targets };
+  return { red, blue, targets, walls };
 }
 
 // Update statistics display
@@ -267,6 +280,7 @@ function updateStats() {
   document.getElementById("redCount")!.textContent = String(counts.red);
   document.getElementById("blueCount")!.textContent = String(counts.blue);
   document.getElementById("targetCount")!.textContent = String(counts.targets);
+  document.getElementById("wallCount")!.textContent = String(counts.walls);
 }
 
 // Level list management

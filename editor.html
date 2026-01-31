@@ -100,6 +100,7 @@
         .tool-red { background: #c44444; }
         .tool-blue { background: #4444c4; }
         .tool-green { background: #4CAF50; }
+        .tool-wall { background: #aaaaaa; }
         .tool-eraser { background: #888; }
 
         .canvas-container {
@@ -295,6 +296,7 @@
         .legend-red { background: #c44444; }
         .legend-blue { background: #4444c4; }
         .legend-green { background: #4CAF50; }
+        .legend-wall { background: #aaaaaa; }
     </style>
 </head>
 <body>
@@ -330,6 +332,11 @@
                 <span>Target</span>
             </button>
             
+            <button class="tool-btn" data-tool="wall">
+                <div class="tool-icon tool-wall">W</div>
+                <span>Wall</span>
+            </button>
+            
             <button class="tool-btn" data-tool="eraser">
                 <div class="tool-icon tool-eraser">✕</div>
                 <span>Eraser</span>
@@ -351,6 +358,10 @@
                 <div class="legend-item">
                     <div class="legend-color legend-green"></div>
                     <span>Collect for points</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color legend-wall"></div>
+                    <span>Impassable barrier</span>
                 </div>
             </div>
         </div>
@@ -387,6 +398,10 @@
                 <div class="level-info-row">
                     <span class="level-info-label">Targets:</span>
                     <span class="level-info-value" id="targetCount">0</span>
+                </div>
+                <div class="level-info-row">
+                    <span class="level-info-label">Walls:</span>
+                    <span class="level-info-value" id="wallCount">0</span>
                 </div>
             </div>
 
