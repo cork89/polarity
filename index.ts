@@ -4,6 +4,7 @@ if (!canvas) {
 }
 const ctx = canvas.getContext("2d")!;
 const scoreElement = document.getElementById("score");
+const timerElement = document.getElementById("timer");
 const levelSelect = document.getElementById("levelSelect") as HTMLSelectElement | null;
 
 // Game settings
@@ -83,6 +84,10 @@ interface Player {
 // Game state
 let score = 0;
 let particles: Particle[] = [];
+let timeRemaining = 30;
+let isGameOver = false;
+let gameStartTime = Date.now();
+let lastTimerUpdate = Date.now();
 
 // Player object
 const player: Player = {
@@ -161,6 +166,13 @@ function loadLevel(levelData: LevelData) {
   if (scoreElement) {
     scoreElement.textContent = "0";
   }
+  timeRemaining = 30;
+  isGameOver = false;
+  lastTimerUpdate = Date.now();
+  if (timerElement) {
+    timerElement.textContent = "Time: 30s";
+    timerElement.classList.remove("warning");
+  }
   particles = [];
   player.vx = 0;
   player.vy = 0;
@@ -231,6 +243,15 @@ function loadDefaultLevel() {
   player.vy = 0;
   player.trail = [];
   player.hasAttracted = false;
+
+  // Reset timer and game state
+  timeRemaining = 30;
+  isGameOver = false;
+  lastTimerUpdate = Date.now();
+  if (timerElement) {
+    timerElement.textContent = "Time: 30s";
+    timerElement.classList.remove("warning");
+  }
 
   spawnRandomTargets();
 }
@@ -327,6 +348,48 @@ document.addEventListener("keydown", (e) => {
 document.addEventListener("keyup", (e) => {
   if (e.key.toLowerCase() === "x") keys.x = false;
   if (e.key.toLowerCase() === "z") keys.z = false;
+});
+
+// Arcade button handling
+const btnZ = document.getElementById("btnZ");
+const btnX = document.getElementById("btnX");
+
+function setupArcadeButton(
+  button: HTMLElement | null,
+  key: "z" | "x"
+) {
+  if (!button) return;
+
+  const startHandler = (e: Event) => {
+    e.preventDefault();
+    keys[key] = true;
+  };
+
+  const endHandler = (e: Event) => {
+    e.preventDefault();
+    keys[key] = false;
+  };
+
+  // Mouse events
+  button.addEventListener("mousedown", startHandler);
+  button.addEventListener("mouseup", endHandler);
+  button.addEventListener("mouseleave", endHandler);
+
+  // Touch events
+  button.addEventListener("touchstart", startHandler, { passive: false });
+  button.addEventListener("touchend", endHandler, { passive: false });
+  button.addEventListener("touchcancel", endHandler, { passive: false });
+}
+
+setupArcadeButton(btnZ, "z");
+setupArcadeButton(btnX, "x");
+
+// Restart game on key press when game over
+document.addEventListener("keydown", (e) => {
+  
+  if (isGameOver && e.key.toLowerCase() === " ") {
+    restartGame();
+  }
 });
 
 // Physics
@@ -585,6 +648,82 @@ function drawAttractionLines() {
   }
 }
 
+// Update timer display and check for game over
+function updateTimer() {
+  if (isGameOver) return;
+
+  const now = Date.now();
+  if (now - lastTimerUpdate >= 1000) {
+    timeRemaining--;
+    lastTimerUpdate = now;
+
+    if (timerElement) {
+      timerElement.textContent = `Time: ${timeRemaining}s`;
+      if (timeRemaining <= 10) {
+        timerElement.classList.add("warning");
+      } else {
+        timerElement.classList.remove("warning");
+      }
+    }
+
+    if (timeRemaining <= 0) {
+      isGameOver = true;
+    }
+  }
+}
+
+// Draw game over screen
+function drawGameOver() {
+  // Semi-transparent overlay
+  ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Game Over text
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 48px Arial";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2 - 60);
+
+  // Points earned text
+  ctx.font = "24px Arial";
+  ctx.fillText(`Points earned: ${score}`, canvas.width / 2, canvas.height / 2);
+
+  // Press to play again text
+  ctx.font = "18px Arial";
+  ctx.fillStyle = "#aaaaaa";
+  ctx.fillText("Press any key or SPACE to play again", canvas.width / 2, canvas.height / 2 + 50);
+}
+
+// Restart the game
+function restartGame() {
+  isGameOver = false;
+  timeRemaining = 30;
+  lastTimerUpdate = Date.now();
+
+  if (timerElement) {
+    timerElement.textContent = "Time: 30s";
+    timerElement.classList.remove("warning");
+  }
+
+  if (currentLevelName) {
+    const levels = getStoredLevels();
+    const level = levels.find(l => l.name === currentLevelName);
+    if (level) {
+      loadLevel(level);
+    } else {
+      loadDefaultLevel();
+    }
+  } else {
+    loadDefaultLevel();
+  }
+
+  score = 0;
+  if (scoreElement) {
+    scoreElement.textContent = "0";
+  }
+}
+
 // Main game loop
 function gameLoop() {
   // Clear canvas
@@ -594,19 +733,34 @@ function gameLoop() {
   // Draw grid
   drawGrid();
 
-  // Update physics
-  applyAttraction();
-  updatePlayer();
-  checkCollisions();
-  updateParticles();
+  if (isGameOver) {
+    // Draw game state (frozen)
+    drawWalls();
+    drawAttractionLines();
+    drawAttractors();
+    drawTargets();
+    drawParticles();
+    drawPlayer();
+    // Draw game over overlay
+    drawGameOver();
+  } else {
+    // Update timer
+    updateTimer();
 
-  // Draw everything
-  drawWalls();
-  drawAttractionLines();
-  drawAttractors();
-  drawTargets();
-  drawParticles();
-  drawPlayer();
+    // Update physics
+    applyAttraction();
+    updatePlayer();
+    checkCollisions();
+    updateParticles();
+
+    // Draw everything
+    drawWalls();
+    drawAttractionLines();
+    drawAttractors();
+    drawTargets();
+    drawParticles();
+    drawPlayer();
+  }
 
   requestAnimationFrame(gameLoop);
 }
