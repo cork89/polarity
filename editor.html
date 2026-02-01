@@ -348,6 +348,27 @@
             background: #4CAF50;
             border-color: #66ff66;
         }
+
+        .game-mode-select {
+            width: 100%;
+            padding: 8px 12px;
+            font-size: 14px;
+            background: #444;
+            color: #fff;
+            border: 2px solid #555;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+
+        .game-mode-select:hover {
+            background: #555;
+        }
+
+        .game-mode-select option {
+            background: #444;
+            color: #fff;
+        }
     </style>
 </head>
 <body>
@@ -433,6 +454,13 @@
             <div class="level-list" id="levelList">
                 <!-- Level items will be inserted here -->
             </div>
+
+            <h3>Game Mode</h3>
+            <select class="level-select" id="gameModeSelect" style="width: 100%; padding: 8px; font-size: 14px; background: #444; color: #fff; border: 2px solid #555; border-radius: 4px; cursor: pointer;">
+                <option value="staged">Staged (3 stages with targets)</option>
+                <option value="timeAttack">Time Attack (30s, auto targets)</option>
+                <option value="sprint">Sprint (250 pts, auto targets)</option>
+            </select>
 
             <h3>Stages</h3>
             <div class="stage-selector">

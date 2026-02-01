@@ -6,7 +6,6 @@ const ctx = canvas.getContext("2d")!;
 const scoreFont = document.getElementById("scoreFont") as HTMLSpanElement | null;
 const timerFont = document.getElementById("timerFont") as HTMLSpanElement | null;
 const levelSelect = document.getElementById("levelSelect") as HTMLSelectElement | null;
-const gameModeSelect = document.getElementById("gameModeSelect") as HTMLSelectElement | null;
 const gameOverOverlay = document.getElementById("gameOverOverlay") as HTMLDivElement | null;
 const gameOverTitle = document.getElementById("gameOverTitle") as HTMLDivElement | null;
 const gameOverScore = document.getElementById("gameOverScore") as HTMLDivElement | null;
@@ -20,7 +19,7 @@ const ATTRACTOR_SIZE = 35;
 const GRAVITY = 0.1;
 
 // Game modes
-type GameMode = "timeAttack" | "sprint";
+type GameMode = "timeAttack" | "sprint" | "staged";
 const SPRINT_TARGET_SCORE = 250;
 const TIME_ATTACK_DURATION = 30;
 
@@ -64,6 +63,7 @@ interface StageData {
 // Level data interface (supports both old single-grid and new multi-stage formats)
 interface LevelData {
   name: string;
+  gameMode?: "timeAttack" | "sprint" | "staged";
   grid?: string[][]; // Old format
   baseGrid?: string[][]; // New format - base layout (player, magnets, walls)
   stages?: StageData[]; // New format - array of stages with targets
@@ -235,6 +235,9 @@ function loadLevel(levelData: LevelData, stageIndex: number = 0, resetState: boo
   currentLevelData = levelData;
   currentStageIndex = stageIndex;
   totalStages = levelData.stages?.length || 1;
+  
+  // Set game mode from level (default to staged for backward compatibility)
+  currentGameMode = levelData.gameMode || "staged";
 
   // Normalize level data to a grid
   const grid = normalizeLevelData(levelData, stageIndex);
@@ -247,7 +250,7 @@ function loadLevel(levelData: LevelData, stageIndex: number = 0, resetState: boo
   if (resetState) {
     score = 0;
     updateScoreFont(0);
-    if (currentGameMode === "sprint") {
+    if (currentGameMode === "sprint" || currentGameMode === "staged") {
       sprintTimeElapsed = 0;
       updateTimerFont(0);
     } else {
@@ -277,8 +280,14 @@ function loadLevel(levelData: LevelData, stageIndex: number = 0, resetState: boo
   // Load attractors, targets, and walls
   redAttractors = reds;
   blueAttractors = blues;
-  targets = targs;
   walls = wallList;
+
+  // For timeAttack and sprint, auto-generate targets instead of using level targets
+  if (currentGameMode === "timeAttack" || currentGameMode === "sprint") {
+    spawnRandomTargets();
+  } else {
+    targets = targs;
+  }
 
   currentLevelName = levelData.name;
 }
@@ -332,7 +341,7 @@ function loadDefaultLevel() {
   player.hasAttracted = false;
 
   // Reset timer and game state based on current mode
-  if (currentGameMode === "sprint") {
+  if (currentGameMode === "sprint" || currentGameMode === "staged") {
     sprintTimeElapsed = 0;
     updateTimerFont(0);
   } else {
@@ -400,17 +409,6 @@ if (levelSelect) {
       loadDefaultLevel();
       score = 0;
       updateScoreFont(0);
-    }
-  });
-}
-
-// Handle game mode selection
-if (gameModeSelect) {
-  gameModeSelect.addEventListener("change", () => {
-    const mode = gameModeSelect.value as GameMode;
-    if (mode === "timeAttack" || mode === "sprint") {
-      currentGameMode = mode;
-      restartGame();
     }
   });
 }
@@ -619,6 +617,14 @@ function checkCollisions() {
           isGameOver = true;
         }
 
+        // Check for Staged mode - all targets collected in all stages
+        if (currentGameMode === "staged") {
+          const allTargetsInCurrentStageCollected = targets.every((t) => t.collected);
+          if (allTargetsInCurrentStageCollected && currentStageIndex >= totalStages - 1) {
+            isGameOver = true;
+          }
+        }
+
         // Create particles
         for (let i = 0; i < 10; i++) {
           particles.push({
@@ -781,7 +787,7 @@ function updateTimer() {
       if (timeRemaining <= 0) {
         isGameOver = true;
       }
-    } else if (currentGameMode === "sprint") {
+    } else if (currentGameMode === "sprint" || currentGameMode === "staged") {
       sprintTimeElapsed++;
       updateTimerFont(sprintTimeElapsed);
     }
@@ -821,7 +827,7 @@ function restartGame() {
   isGameOver = false;
   lastTimerUpdate = Date.now();
 
-  if (currentGameMode === "sprint") {
+  if (currentGameMode === "sprint" || currentGameMode === "staged") {
     sprintTimeElapsed = 0;
     updateTimerFont(0);
   } else {

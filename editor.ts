@@ -38,6 +38,7 @@ interface Stage {
 // Level data structure with multi-stage support
 interface Level {
   name: string;
+  gameMode: "timeAttack" | "sprint" | "staged";
   baseGrid: GridCell[][]; // Contains P, R, B, W (no T)
   stages: Stage[]; // Array of stages, each with target positions
 }
@@ -51,7 +52,7 @@ let levels: Level[] = [];
 let currentStageIndex: number = 0;
 
 // Create a new empty level with default stages
-function createEmptyLevel(name: string = "Untitled"): Level {
+function createEmptyLevel(name: string = "Untitled", gameMode: "timeAttack" | "sprint" | "staged" = "staged"): Level {
   // Create empty 6x6 base grid filled with spaces
   const baseGrid: GridCell[][] = [];
   for (let y = 0; y < GRID_SIZE; y++) {
@@ -75,6 +76,7 @@ function createEmptyLevel(name: string = "Untitled"): Level {
 
   return {
     name: name,
+    gameMode: gameMode,
     baseGrid: baseGrid,
     stages: stages,
   };
@@ -185,7 +187,12 @@ function validateLevel(): { valid: boolean; error: string | null } {
     return { valid: false, error: "No player placed" };
   }
 
-  // Check each stage
+  // Time Attack and Sprint only need a player
+  if (currentLevel.gameMode === "timeAttack" || currentLevel.gameMode === "sprint") {
+    return { valid: true, error: null };
+  }
+
+  // Staged mode requires targets in all stages
   for (let stageIdx = 0; stageIdx < currentLevel.stages.length; stageIdx++) {
     const stage = currentLevel.stages[stageIdx];
     if (!stage) continue;
@@ -202,6 +209,38 @@ function validateLevel(): { valid: boolean; error: string | null } {
   }
 
   return { valid: true, error: null };
+}
+
+// Update editor UI based on game mode
+function updateEditorForGameMode() {
+  const targetToolBtn = document.querySelector('[data-tool="target"]') as HTMLElement;
+  const stageSelector = document.querySelector('.stage-selector') as HTMLElement;
+  const targetCountEl = document.getElementById("targetCount")?.parentElement;
+  const gameModeSelect = document.getElementById("gameModeSelect") as HTMLSelectElement;
+  
+  // Update the game mode selector to match current level
+  if (gameModeSelect) {
+    gameModeSelect.value = currentLevel.gameMode;
+  }
+  
+  if (currentLevel.gameMode === "timeAttack" || currentLevel.gameMode === "sprint") {
+    // Hide target-related UI
+    if (targetToolBtn) targetToolBtn.style.display = "none";
+    if (stageSelector) stageSelector.style.display = "none";
+    if (targetCountEl) targetCountEl.style.display = "none";
+    
+    // Clear any existing targets from stages
+    currentLevel.stages.forEach(stage => stage.targets = []);
+  } else {
+    // Show all UI for staged mode
+    if (targetToolBtn) targetToolBtn.style.display = "flex";
+    if (stageSelector) stageSelector.style.display = "flex";
+    if (targetCountEl) targetCountEl.style.display = "flex";
+  }
+  
+  draw();
+  updateStats();
+  updateValidationUI();
 }
 
 // Update UI based on validation state
@@ -255,6 +294,12 @@ function getObjectAt(gridX: number, gridY: number): GridCell {
 function placeObject(gridX: number, gridY: number) {
   if (!isValidGridPos(gridX, gridY)) return;
   if (!currentLevel || !currentLevel.baseGrid || !currentLevel.stages) return;
+
+  // Prevent placing targets in Time Attack or Sprint modes
+  if (currentTool === "target" && 
+      (currentLevel.gameMode === "timeAttack" || currentLevel.gameMode === "sprint")) {
+    return;
+  }
 
   const letter = TOOL_TO_LETTER[currentTool];
 
@@ -475,6 +520,14 @@ document.querySelectorAll(".stage-btn").forEach(btn => {
   });
 });
 
+// Game mode selection
+document.getElementById("gameModeSelect")?.addEventListener("change", (e) => {
+  const select = e.target as HTMLSelectElement;
+  const newMode = select.value as "timeAttack" | "sprint" | "staged";
+  currentLevel.gameMode = newMode;
+  updateEditorForGameMode();
+});
+
 // Update stage selector UI
 function updateStageSelector() {
   document.querySelectorAll(".stage-btn").forEach(btn => {
@@ -596,6 +649,7 @@ function loadLevel(level: Level) {
   currentStageIndex = 0; // Reset to first stage
   renderLevelList();
   updateStageSelector();
+  updateEditorForGameMode();
   draw();
   updateStats();
   updateValidationUI();
@@ -606,6 +660,7 @@ document.getElementById("newLevelBtn")!.addEventListener("click", () => {
   const name = prompt("Enter level name:", "New Level");
   if (name) {
     currentLevel = createEmptyLevel(name.trim() || "New Level");
+    updateEditorForGameMode();
     draw();
     updateStats();
     updateValidationUI();
@@ -705,6 +760,7 @@ document.getElementById("importBtn")!.addEventListener("change", (e) => {
           if (levelData.baseGrid && Array.isArray(levelData.baseGrid)) {
             level = {
               name: levelData.name || "Imported Level",
+              gameMode: levelData.gameMode || "staged",
               baseGrid: levelData.baseGrid as GridCell[][],
               stages: levelData.stages || [{ targets: [] }],
             };
@@ -773,6 +829,7 @@ function convertSingleGridToMultiStage(levelData: any): Level {
 
   return {
     name: levelData.name || "Imported Level",
+    gameMode: levelData.gameMode || "staged",
     baseGrid: baseGrid,
     stages: stages,
   };
@@ -849,6 +906,7 @@ function convertOldFormatToNew(oldLevel: any): Level {
 
   return {
     name: oldLevel.name || "Imported Level",
+    gameMode: oldLevel.gameMode || "staged",
     baseGrid: baseGrid,
     stages: stages,
   };
