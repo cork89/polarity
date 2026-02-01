@@ -3,10 +3,6 @@ if (!canvas) {
     throw new Error("failed")
 }
 const ctx = canvas.getContext("2d")!;
-const scoreCanvas = document.getElementById("scoreCanvas") as HTMLCanvasElement;
-const scoreCtx = scoreCanvas?.getContext("2d");
-const timerCanvas = document.getElementById("timerCanvas") as HTMLCanvasElement;
-const timerCtx = timerCanvas?.getContext("2d");
 const scoreFont = document.getElementById("scoreFont") as HTMLSpanElement | null;
 const timerFont = document.getElementById("timerFont") as HTMLSpanElement | null;
 const levelSelect = document.getElementById("levelSelect") as HTMLSelectElement | null;
@@ -38,91 +34,6 @@ const COLOR_WALL_OUTER = "#aaaaaa";
 const COLOR_WALL_INNER = "#cccccc";
 const COLOR_ATTRACTION_LINE_RED = "rgba(255, 100, 100, 0.3)";
 const COLOR_ATTRACTION_LINE_BLUE = "rgba(100, 100, 255, 0.3)";
-
-// 7-segment display constants
-const SEGMENT_COLOR = "#ffdd00";
-const SEGMENT_OFF_COLOR = "#332200";
-const DIGIT_SPACING = 4;
-
-// 7-segment digit patterns (segments: a,b,c,d,e,f,g)
-const DIGIT_PATTERNS: boolean[][] = [
-  [true, true, true, true, true, true, false],   // 0
-  [false, true, true, false, false, false, false], // 1
-  [true, true, false, true, true, false, true],  // 2
-  [true, true, true, true, false, false, true],  // 3
-  [false, true, true, false, false, true, true], // 4
-  [true, false, true, true, false, true, true],  // 5
-  [true, false, true, true, true, true, true],   // 6
-  [true, true, true, false, false, false, false], // 7
-  [true, true, true, true, true, true, true],    // 8
-  [true, true, true, true, false, true, true],   // 9
-];
-
-// Draw a single digit on a canvas context
-function drawDigit(ctx: CanvasRenderingContext2D, digit: number, x: number, y: number, width: number, height: number) {
-  const pattern = DIGIT_PATTERNS[digit] ?? DIGIT_PATTERNS[0];
-  if (!pattern) return;
-  const segWidth = width * 0.2;
-  const segLength = height * 0.4;
-  const gap = segWidth * 0.2;
-
-  // Segment positions (relative to digit top-left)
-  // a: top, b: top-right, c: bottom-right, d: bottom, e: bottom-left, f: top-left, g: middle
-  const segments = [
-    { x: segWidth + gap, y: 0, w: segLength, h: segWidth, horiz: true },           // a
-    { x: segWidth + segLength + gap, y: gap, w: segWidth, h: segLength, horiz: false }, // b
-    { x: segWidth + segLength + gap, y: segLength + gap * 2, w: segWidth, h: segLength, horiz: false }, // c
-    { x: segWidth + gap, y: segLength * 2 + gap * 2, w: segLength, h: segWidth, horiz: true }, // d
-    { x: 0, y: segLength + gap * 2, w: segWidth, h: segLength, horiz: false },     // e
-    { x: 0, y: gap, w: segWidth, h: segLength, horiz: false },                     // f
-    { x: segWidth + gap, y: segLength + gap, w: segLength, h: segWidth, horiz: true }, // g
-  ];
-
-  segments.forEach((seg, i) => {
-    ctx.fillStyle = pattern[i] ? SEGMENT_COLOR : SEGMENT_OFF_COLOR;
-    ctx.beginPath();
-    if (seg.horiz) {
-      // Horizontal segment with pointed ends
-      const halfHeight = seg.h / 2;
-      ctx.moveTo(x + seg.x + halfHeight, y + seg.y);
-      ctx.lineTo(x + seg.x + seg.w - halfHeight, y + seg.y);
-      ctx.lineTo(x + seg.x + seg.w, y + seg.y + halfHeight);
-      ctx.lineTo(x + seg.x + seg.w - halfHeight, y + seg.y + seg.h);
-      ctx.lineTo(x + seg.x + halfHeight, y + seg.y + seg.h);
-      ctx.lineTo(x + seg.x, y + seg.y + halfHeight);
-    } else {
-      // Vertical segment with pointed ends
-      const halfWidth = seg.w / 2;
-      ctx.moveTo(x + seg.x, y + seg.y + halfWidth);
-      ctx.lineTo(x + seg.x + halfWidth, y + seg.y);
-      ctx.lineTo(x + seg.x + seg.w, y + seg.y + halfWidth);
-      ctx.lineTo(x + seg.x + seg.w, y + seg.y + seg.h - halfWidth);
-      ctx.lineTo(x + seg.x + halfWidth, y + seg.y + seg.h);
-      ctx.lineTo(x + seg.x, y + seg.y + seg.h - halfWidth);
-    }
-    ctx.closePath();
-    ctx.fill();
-  });
-}
-
-// Draw a number on a 7-segment display canvas
-function drawSevenSegmentNumber(ctx: CanvasRenderingContext2D, value: number, maxDigits: number) {
-  const canvas = ctx.canvas;
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  const strValue = Math.floor(value).toString().padStart(maxDigits, " ");
-  const digitWidth = (canvas.width - 20) / maxDigits;
-  const digitHeight = canvas.height - 10;
-
-  for (let i = 0; i < maxDigits; i++) {
-    const char = strValue[i] ?? " ";
-    if (char === " ") continue;
-    const digit = parseInt(char, 10);
-    const x = 10 + i * digitWidth;
-    const y = 5;
-    drawDigit(ctx, digit, x, y, digitWidth - DIGIT_SPACING, digitHeight);
-  }
-}
 
 // Update font-based displays
 function updateFontDisplay(element: HTMLSpanElement | null, value: number, maxDigits: number) {
@@ -268,16 +179,10 @@ function parseGrid(grid: string[][]) {
 function loadLevel(levelData: LevelData) {
   // Reset game state
   score = 0;
-  if (scoreCtx) {
-    drawSevenSegmentNumber(scoreCtx, 0, 5);
-  }
   updateScoreFont(0);
   timeRemaining = 30;
   isGameOver = false;
   lastTimerUpdate = Date.now();
-  if (timerCtx) {
-    drawSevenSegmentNumber(timerCtx, 30, 5);
-  }
   updateTimerFont(30);
   particles = [];
   player.vx = 0;
@@ -354,9 +259,6 @@ function loadDefaultLevel() {
   timeRemaining = 30;
   isGameOver = false;
   lastTimerUpdate = Date.now();
-  if (timerCtx) {
-    drawSevenSegmentNumber(timerCtx, 30, 5);
-  }
   updateTimerFont(30);
 
   spawnRandomTargets();
@@ -416,9 +318,6 @@ if (levelSelect) {
       // Random level selected
       loadDefaultLevel();
       score = 0;
-      if (scoreCtx) {
-        drawSevenSegmentNumber(scoreCtx, 0, 5);
-      }
       updateScoreFont(0);
     }
   });
@@ -620,9 +519,6 @@ function checkCollisions() {
       ) {
         target.collected = true;
         score += 10;
-        if (scoreCtx) {
-            drawSevenSegmentNumber(scoreCtx, score, 5);
-        }
         updateScoreFont(score);
 
         // Create particles
@@ -777,9 +673,6 @@ function updateTimer() {
     timeRemaining--;
     lastTimerUpdate = now;
 
-    if (timerCtx) {
-      drawSevenSegmentNumber(timerCtx, timeRemaining, 5);
-    }
     updateTimerFont(timeRemaining);
 
     if (timeRemaining <= 0) {
@@ -811,9 +704,6 @@ function restartGame() {
   timeRemaining = 30;
   lastTimerUpdate = Date.now();
 
-  if (timerCtx) {
-    drawSevenSegmentNumber(timerCtx, 30, 5);
-  }
   updateTimerFont(30);
 
   if (currentLevelName) {
@@ -829,9 +719,6 @@ function restartGame() {
   }
 
   score = 0;
-  if (scoreCtx) {
-    drawSevenSegmentNumber(scoreCtx, 0, 5);
-  }
   updateScoreFont(0);
 }
 
