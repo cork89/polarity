@@ -8,6 +8,8 @@ const scoreCtx = scoreCanvas?.getContext("2d");
 const timerCanvas = document.getElementById("timerCanvas") as HTMLCanvasElement;
 const timerCtx = timerCanvas?.getContext("2d");
 const levelSelect = document.getElementById("levelSelect") as HTMLSelectElement | null;
+const gameOverOverlay = document.getElementById("gameOverOverlay") as HTMLDivElement | null;
+const gameOverScore = document.getElementById("gameOverScore") as HTMLDivElement | null;
 
 // Game settings
 const GRID_SIZE = 6;
@@ -764,27 +766,21 @@ function updateTimer() {
   }
 }
 
-// Draw game over screen
+// Show/hide game over overlay
 function drawGameOver() {
-  // Semi-transparent overlay
-  ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  if (gameOverOverlay) {
+    gameOverOverlay.classList.add("visible");
+  }
+  if (gameOverScore) {
+    gameOverScore.textContent = `Points earned: ${score}`;
+  }
+}
 
-  // Game Over text
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "bold 48px Arial";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2 - 60);
-
-  // Points earned text
-  ctx.font = "24px Arial";
-  ctx.fillText(`Points earned: ${score}`, canvas.width / 2, canvas.height / 2);
-
-  // Press to play again text
-  ctx.font = "18px Arial";
-  ctx.fillStyle = "#aaaaaa";
-  ctx.fillText("Press any key or SPACE to play again", canvas.width / 2, canvas.height / 2 + 50);
+// Hide game over overlay
+function hideGameOver() {
+  if (gameOverOverlay) {
+    gameOverOverlay.classList.remove("visible");
+  }
 }
 
 // Restart the game
@@ -832,9 +828,11 @@ function gameLoop() {
     drawTargets();
     drawParticles();
     drawPlayer();
-    // Draw game over overlay
+    // Show game over overlay
     drawGameOver();
   } else {
+    // Hide game over overlay when not in game over state
+    hideGameOver();
     // Update timer
     updateTimer();
 

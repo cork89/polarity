@@ -121,6 +121,7 @@
             justify-content: space-between;
             padding: 0 30px;
             pointer-events: none;
+            z-index: 20;
         }
 
         /* Arcade button base styles */
@@ -188,6 +189,43 @@
                 background: inherit;
             }
         }
+
+        /* Game Over Overlay */
+        .game-over-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1;
+        }
+
+        .game-over-overlay.visible {
+            display: flex;
+        }
+
+        .game-over-title {
+            color: #ffffff;
+            font-size: 48px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+
+        .game-over-score {
+            color: #ffffff;
+            font-size: 24px;
+            margin-bottom: 30px;
+        }
+
+        .game-over-hint {
+            color: #aaaaaa;
+            font-size: 18px;
+        }
     </style>
 </head>
 <body>
@@ -207,6 +245,11 @@
     </div>
     <div class="game-container">
         <canvas id="gameCanvas" width="600" height="600"></canvas>
+        <div class="game-over-overlay" id="gameOverOverlay">
+            <div class="game-over-title">GAME OVER</div>
+            <div class="game-over-score" id="gameOverScore">Points earned: 0</div>
+            <div class="game-over-hint">Press any key or SPACE to play again</div>
+        </div>
         <div class="arcade-buttons">
             <button class="arcade-button blue" id="btnZ" aria-label="Attract to blue squares">
                 <span class="button-label">Z</span>
