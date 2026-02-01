@@ -30,38 +30,58 @@ const LETTER_TO_TOOL: Record<GridCell, Tool | null> = {
   "W": "wall",
 };
 
-// Level data structure (new compact format)
-interface Level {
-  name: string;
-  grid: GridCell[][];
+// Stage data structure - only targets vary per stage
+interface Stage {
+  targets: { x: number; y: number }[];
 }
 
-// Current level being edited
-let currentLevel: Level = createEmptyLevel();
-let levels: Level[] = [];
+// Level data structure with multi-stage support
+interface Level {
+  name: string;
+  baseGrid: GridCell[][]; // Contains P, R, B, W (no T)
+  stages: Stage[]; // Array of stages, each with target positions
+}
 
-// Create a new empty level
+// Must define constants before they are used
+const DEFAULT_STAGE_COUNT = 3;
+
+// Current level being edited
+let currentLevel: Level;
+let levels: Level[] = [];
+let currentStageIndex: number = 0;
+
+// Create a new empty level with default stages
 function createEmptyLevel(name: string = "Untitled"): Level {
-  // Create empty 6x6 grid filled with spaces
-  const grid: GridCell[][] = [];
+  // Create empty 6x6 base grid filled with spaces
+  const baseGrid: GridCell[][] = [];
   for (let y = 0; y < GRID_SIZE; y++) {
     const row: GridCell[] = [];
     for (let x = 0; x < GRID_SIZE; x++) {
       row.push(" ");
     }
-    grid.push(row);
+    baseGrid.push(row);
   }
-  
+
   // Place player in center
-  if (grid[2] && grid[2][2]) {
-    grid[2][2] = "P";
+  if (baseGrid[2] && baseGrid[2][2]) {
+    baseGrid[2][2] = "P";
   }
-  
+
+  // Create default stages (3 stages with no targets initially)
+  const stages: Stage[] = [];
+  for (let i = 0; i < DEFAULT_STAGE_COUNT; i++) {
+    stages.push({ targets: [] });
+  }
+
   return {
     name: name,
-    grid: grid,
+    baseGrid: baseGrid,
+    stages: stages,
   };
 }
+
+// Initialize current level after createEmptyLevel is defined
+currentLevel = createEmptyLevel();
 
 // Convert grid coordinates to pixel coordinates
 function gridToPixel(gridX: number, gridY: number): { x: number; y: number } {
@@ -85,24 +105,199 @@ function isValidGridPos(gridX: number, gridY: number): boolean {
   return gridX >= 0 && gridX < GRID_SIZE && gridY >= 0 && gridY < GRID_SIZE;
 }
 
-// Get object at grid position
+// Find player position in base grid
+function findPlayerPosition(): { x: number; y: number } | null {
+  for (let y = 0; y < GRID_SIZE; y++) {
+    const row = currentLevel.baseGrid[y];
+    if (!row) continue;
+    for (let x = 0; x < GRID_SIZE; x++) {
+      if (row[x] === "P") {
+        return { x, y };
+      }
+    }
+  }
+  return null;
+}
+
+// Find all target positions in current stage
+function findTargetPositions(): { x: number; y: number }[] {
+  const stage = currentLevel.stages[currentStageIndex];
+  if (!stage) return [];
+  return [...stage.targets];
+}
+
+// Check if a target is reachable from the player using BFS
+// A target is reachable if there's a path that doesn't go through walls
+function isTargetReachable(targetX: number, targetY: number, playerPos: { x: number; y: number }): boolean {
+  const visited: boolean[][] = [];
+  for (let y = 0; y < GRID_SIZE; y++) {
+    visited.push(new Array(GRID_SIZE).fill(false));
+  }
+
+  const queue: { x: number; y: number }[] = [playerPos];
+  visited[playerPos.y]![playerPos.x] = true;
+
+  const directions = [
+    { dx: 0, dy: -1 }, // up
+    { dx: 0, dy: 1 },  // down
+    { dx: -1, dy: 0 }, // left
+    { dx: 1, dy: 0 },  // right
+  ];
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+
+    // Check if we reached the target
+    if (current.x === targetX && current.y === targetY) {
+      return true;
+    }
+
+    // Explore neighbors
+    for (const dir of directions) {
+      const newX = current.x + dir.dx;
+      const newY = current.y + dir.dy;
+
+      if (isValidGridPos(newX, newY)) {
+        const visitedRow = visited[newY];
+        const gridRow = currentLevel.baseGrid[newY];
+
+        if (visitedRow && !visitedRow[newX] && gridRow) {
+          const cell = gridRow[newX];
+          // Can move through empty spaces, attractors, and the player start
+          // Cannot move through walls
+          if (cell !== "W") {
+            visitedRow[newX] = true;
+            queue.push({ x: newX, y: newY });
+          }
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
+// Validate level: check if player exists and all stages have reachable targets
+function validateLevel(): { valid: boolean; error: string | null } {
+  const playerPos = findPlayerPosition();
+
+  if (!playerPos) {
+    return { valid: false, error: "No player placed" };
+  }
+
+  // Check each stage
+  for (let stageIdx = 0; stageIdx < currentLevel.stages.length; stageIdx++) {
+    const stage = currentLevel.stages[stageIdx];
+    if (!stage) continue;
+
+    if (stage.targets.length === 0) {
+      return { valid: false, error: `Stage ${stageIdx + 1} has no targets` };
+    }
+
+    for (const target of stage.targets) {
+      if (!isTargetReachable(target.x, target.y, playerPos)) {
+        return { valid: false, error: `Stage ${stageIdx + 1} has unreachable target` };
+      }
+    }
+  }
+
+  return { valid: true, error: null };
+}
+
+// Update UI based on validation state
+function updateValidationUI() {
+  const validation = validateLevel();
+  const saveBtn = document.getElementById("saveBtn") as HTMLButtonElement;
+  const canvas = document.getElementById("editorCanvas") as HTMLCanvasElement;
+  const validationMessage = document.getElementById("validationMessage") as HTMLDivElement;
+  
+  if (!validation.valid) {
+    saveBtn.disabled = true;
+    saveBtn.style.opacity = "0.5";
+    saveBtn.style.cursor = "not-allowed";
+    canvas.style.border = "4px solid #c44444";
+    canvas.style.borderRadius = "4px";
+    validationMessage.classList.add("visible");
+    validationMessage.textContent = validation.error || "Invalid level";
+  } else {
+    saveBtn.disabled = false;
+    saveBtn.style.opacity = "1";
+    saveBtn.style.cursor = "pointer";
+    canvas.style.border = "2px solid #555";
+    canvas.style.borderRadius = "0";
+    validationMessage.classList.remove("visible");
+  }
+}
+
+// Get object at grid position (merged view of base + current stage)
 function getObjectAt(gridX: number, gridY: number): GridCell {
   if (!isValidGridPos(gridX, gridY)) return " ";
-  const row = currentLevel.grid[gridY];
-  return row ? row[gridX] ?? " " : " ";
+  if (!currentLevel || !currentLevel.baseGrid || !currentLevel.stages) return " ";
+
+  // Check base grid first (P, R, B, W)
+  const baseRow = currentLevel.baseGrid[gridY];
+  const baseCell = baseRow ? baseRow[gridX] : " ";
+  if (baseCell && baseCell !== " ") {
+    return baseCell;
+  }
+
+  // Check current stage for targets
+  const stage = currentLevel.stages[currentStageIndex];
+  if (stage) {
+    const target = stage.targets.find(t => t.x === gridX && t.y === gridY);
+    if (target) return "T";
+  }
+
+  return " ";
 }
 
 // Place or remove object at grid position
 function placeObject(gridX: number, gridY: number) {
   if (!isValidGridPos(gridX, gridY)) return;
-  
+  if (!currentLevel || !currentLevel.baseGrid || !currentLevel.stages) return;
+
   const letter = TOOL_TO_LETTER[currentTool];
-  const row = currentLevel.grid[gridY];
-  if (row) {
-    row[gridX] = letter;
+
+  if (letter === "T") {
+    // Targets go into current stage
+    const stage = currentLevel.stages[currentStageIndex];
+    if (!stage) return;
+
+    // Check if target already exists at this position
+    const existingIndex = stage.targets.findIndex(t => t.x === gridX && t.y === gridY);
+
+    if (existingIndex >= 0) {
+      // Remove target
+      stage.targets.splice(existingIndex, 1);
+    } else {
+      // Add target
+      stage.targets.push({ x: gridX, y: gridY });
+    }
+  } else if (letter === " ") {
+    // Eraser - try to remove from both base and current stage
+    const baseRow = currentLevel.baseGrid[gridY];
+    if (baseRow) {
+      baseRow[gridX] = " ";
+    }
+
+    // Also remove from current stage if it's a target
+    const stage = currentLevel.stages[currentStageIndex];
+    if (stage) {
+      const existingIndex = stage.targets.findIndex(t => t.x === gridX && t.y === gridY);
+      if (existingIndex >= 0) {
+        stage.targets.splice(existingIndex, 1);
+      }
+    }
+  } else {
+    // Player, magnets, walls go into base grid
+    const baseRow = currentLevel.baseGrid[gridY];
+    if (baseRow) {
+      baseRow[gridX] = letter;
+    }
   }
-  
+
   updateStats();
+  updateValidationUI();
   draw();
 }
 
@@ -180,8 +375,14 @@ function drawWall(gridX: number, gridY: number) {
 }
 
 function drawGridContents() {
+  // Safety check
+  if (!currentLevel || !currentLevel.baseGrid || !currentLevel.stages) {
+    return;
+  }
+
+  // Draw base grid contents (P, R, B, W)
   for (let y = 0; y < GRID_SIZE; y++) {
-    const row = currentLevel.grid[y];
+    const row = currentLevel.baseGrid[y];
     if (!row) continue;
     for (let x = 0; x < GRID_SIZE; x++) {
       const cell = row[x];
@@ -195,13 +396,18 @@ function drawGridContents() {
         case "B":
           drawBlueAttractor(x, y);
           break;
-        case "T":
-          drawTarget(x, y);
-          break;
         case "W":
           drawWall(x, y);
           break;
       }
+    }
+  }
+
+  // Draw current stage targets
+  const stage = currentLevel.stages[currentStageIndex];
+  if (stage) {
+    for (const target of stage.targets) {
+      drawTarget(target.x, target.y);
     }
   }
 }
@@ -256,20 +462,53 @@ document.querySelectorAll(".tool-btn").forEach(btn => {
   });
 });
 
-// Count objects in grid
+// Stage selection
+document.querySelectorAll(".stage-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".stage-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    const stageIndex = parseInt(btn.getAttribute("data-stage") || "0", 10);
+    currentStageIndex = stageIndex;
+    updateStats();
+    updateValidationUI();
+    draw();
+  });
+});
+
+// Update stage selector UI
+function updateStageSelector() {
+  document.querySelectorAll(".stage-btn").forEach(btn => {
+    const stageIndex = parseInt(btn.getAttribute("data-stage") || "0", 10);
+    if (stageIndex === currentStageIndex) {
+      btn.classList.add("active");
+    } else {
+      btn.classList.remove("active");
+    }
+  });
+}
+
+// Count objects in base grid and current stage
 function countObjects(): { red: number; blue: number; targets: number; walls: number } {
   let red = 0, blue = 0, targets = 0, walls = 0;
+
+  // Count from base grid (P, R, B, W)
   for (let y = 0; y < GRID_SIZE; y++) {
-    const row = currentLevel.grid[y];
+    const row = currentLevel.baseGrid[y];
     if (!row) continue;
     for (let x = 0; x < GRID_SIZE; x++) {
       const cell = row[x];
       if (cell === "R") red++;
       if (cell === "B") blue++;
-      if (cell === "T") targets++;
       if (cell === "W") walls++;
     }
   }
+
+  // Count targets from current stage
+  const stage = currentLevel.stages[currentStageIndex];
+  if (stage) {
+    targets = stage.targets.length;
+  }
+
   return { red, blue, targets, walls };
 }
 
@@ -354,9 +593,12 @@ function renderLevelList() {
 
 function loadLevel(level: Level) {
   currentLevel = JSON.parse(JSON.stringify(level)); // Deep copy
+  currentStageIndex = 0; // Reset to first stage
   renderLevelList();
+  updateStageSelector();
   draw();
   updateStats();
+  updateValidationUI();
 }
 
 // New level button
@@ -366,6 +608,7 @@ document.getElementById("newLevelBtn")!.addEventListener("click", () => {
     currentLevel = createEmptyLevel(name.trim() || "New Level");
     draw();
     updateStats();
+    updateValidationUI();
   }
 });
 
@@ -383,6 +626,12 @@ function incrementLevelName(name: string): string {
 
 // Save button
 document.getElementById("saveBtn")!.addEventListener("click", () => {
+  const validation = validateLevel();
+  if (!validation.valid) {
+    alert("Cannot save: " + validation.error);
+    return;
+  }
+  
   const existingIndex = levels.findIndex(l => l.name === currentLevel.name);
   if (existingIndex !== -1) {
     levels[existingIndex] = JSON.parse(JSON.stringify(currentLevel));
@@ -394,9 +643,9 @@ document.getElementById("saveBtn")!.addEventListener("click", () => {
   
   // Increment the name for the next level
   currentLevel.name = incrementLevelName(currentLevel.name);
-  // Clear the grid for the new level (keep player)
+  // Clear the base grid for the new level (keep player)
   for (let y = 0; y < GRID_SIZE; y++) {
-    const row = currentLevel.grid[y];
+    const row = currentLevel.baseGrid[y];
     if (!row) continue;
     for (let x = 0; x < GRID_SIZE; x++) {
       if (row[x] !== "P") {
@@ -404,8 +653,15 @@ document.getElementById("saveBtn")!.addEventListener("click", () => {
       }
     }
   }
+  // Reset stages for the new level
+  currentLevel.stages = [];
+  for (let i = 0; i < DEFAULT_STAGE_COUNT; i++) {
+    currentLevel.stages.push({ targets: [] });
+  }
+  currentStageIndex = 0;
   
   updateStats();
+  updateValidationUI();
   draw();
   alert("Level saved! Ready to create the next level.");
 });
@@ -427,7 +683,7 @@ document.getElementById("exportBtn")!.addEventListener("click", () => {
   URL.revokeObjectURL(url);
 });
 
-// Import from JSON (handles both old and new formats)
+// Import from JSON (handles both old and new multi-stage formats)
 document.getElementById("importBtn")!.addEventListener("change", (e) => {
   const input = e.target as HTMLInputElement;
   const file = input.files?.[0];
@@ -437,20 +693,24 @@ document.getElementById("importBtn")!.addEventListener("change", (e) => {
   reader.onload = (event) => {
     try {
       const data = JSON.parse(event.target?.result as string);
-      
+
       if (data.levels && Array.isArray(data.levels) && data.levels.length > 0) {
         // Import all levels
         const importedLevels: Level[] = [];
-        
+
         data.levels.forEach((levelData: any) => {
           let level: Level;
-          
-          // Check if it's the new compact format (has 'grid' property)
-          if (levelData.grid && Array.isArray(levelData.grid)) {
+
+          // Check if it's the new multi-stage format (has 'baseGrid' property)
+          if (levelData.baseGrid && Array.isArray(levelData.baseGrid)) {
             level = {
               name: levelData.name || "Imported Level",
-              grid: levelData.grid as GridCell[][],
+              baseGrid: levelData.baseGrid as GridCell[][],
+              stages: levelData.stages || [{ targets: [] }],
             };
+          } else if (levelData.grid && Array.isArray(levelData.grid)) {
+            // Convert old single-grid format to multi-stage format
+            level = convertSingleGridToMultiStage(levelData);
           } else if (levelData.playerGridX !== undefined) {
             // Convert old format to new format
             level = convertOldFormatToNew(levelData);
@@ -459,10 +719,10 @@ document.getElementById("importBtn")!.addEventListener("change", (e) => {
             console.warn("Unknown level format:", levelData);
             return;
           }
-          
+
           importedLevels.push(level);
         });
-        
+
         if (importedLevels.length > 0 && importedLevels[0]) {
           // Add all imported levels
           importedLevels.forEach(level => levels.push(level));
@@ -483,64 +743,114 @@ document.getElementById("importBtn")!.addEventListener("change", (e) => {
   reader.readAsText(file);
 });
 
-// Convert old level format to new grid format
+// Convert single-grid format to multi-stage format
+function convertSingleGridToMultiStage(levelData: any): Level {
+  const baseGrid: GridCell[][] = [];
+  const targets: { x: number; y: number }[] = [];
+
+  for (let y = 0; y < GRID_SIZE; y++) {
+    const row: GridCell[] = [];
+    const sourceRow = levelData.grid[y];
+    for (let x = 0; x < GRID_SIZE; x++) {
+      const cell = sourceRow ? sourceRow[x] : " ";
+      if (cell === "T") {
+        // Collect targets separately
+        targets.push({ x, y });
+        row.push(" ");
+      } else {
+        row.push(cell);
+      }
+    }
+    baseGrid.push(row);
+  }
+
+  // Create single stage with all targets
+  const stages: Stage[] = [{ targets }];
+  // Add empty stages to reach default count
+  while (stages.length < DEFAULT_STAGE_COUNT) {
+    stages.push({ targets: [] });
+  }
+
+  return {
+    name: levelData.name || "Imported Level",
+    baseGrid: baseGrid,
+    stages: stages,
+  };
+}
+
+// Convert old level format to new multi-stage format
 function convertOldFormatToNew(oldLevel: any): Level {
-  const grid: GridCell[][] = [];
+  const baseGrid: GridCell[][] = [];
   for (let y = 0; y < GRID_SIZE; y++) {
     const row: GridCell[] = [];
     for (let x = 0; x < GRID_SIZE; x++) {
       row.push(" ");
     }
-    grid.push(row);
+    baseGrid.push(row);
   }
-  
+
   // Place player
   if (oldLevel.playerGridX !== undefined && oldLevel.playerGridY !== undefined) {
-    const playerRow = grid[oldLevel.playerGridY];
+    const playerRow = baseGrid[oldLevel.playerGridY];
     if (playerRow) {
       playerRow[oldLevel.playerGridX] = "P";
     }
   }
-  
+
   // Place red attractors
   if (oldLevel.redAttractors && Array.isArray(oldLevel.redAttractors)) {
     oldLevel.redAttractors.forEach((a: any) => {
       if (isValidGridPos(a.gridX, a.gridY)) {
-        const row = grid[a.gridY];
+        const row = baseGrid[a.gridY];
         if (row) {
           row[a.gridX] = "R";
         }
       }
     });
   }
-  
+
   // Place blue attractors
   if (oldLevel.blueAttractors && Array.isArray(oldLevel.blueAttractors)) {
     oldLevel.blueAttractors.forEach((a: any) => {
       if (isValidGridPos(a.gridX, a.gridY)) {
-        const row = grid[a.gridY];
+        const row = baseGrid[a.gridY];
         if (row) {
           row[a.gridX] = "B";
         }
       }
     });
   }
-  
-  // Place targets
-  if (oldLevel.targets && Array.isArray(oldLevel.targets)) {
-    oldLevel.targets.forEach((t: any) => {
-      if (isValidGridPos(t.gridX, t.gridY)) {
-        const row = grid[t.gridY];
+
+  // Place walls
+  if (oldLevel.walls && Array.isArray(oldLevel.walls)) {
+    oldLevel.walls.forEach((w: any) => {
+      if (isValidGridPos(w.gridX, w.gridY)) {
+        const row = baseGrid[w.gridY];
         if (row) {
-          row[t.gridX] = "T";
+          row[w.gridX] = "W";
         }
       }
     });
   }
-  
+
+  // Create stages from targets
+  const stages: Stage[] = [];
+  if (oldLevel.targets && Array.isArray(oldLevel.targets)) {
+    const targets = oldLevel.targets.map((t: any) => ({ x: t.gridX, y: t.gridY }));
+    stages.push({ targets });
+  } else {
+    stages.push({ targets: [] });
+  }
+
+  // Add empty stages to reach default count
+  while (stages.length < DEFAULT_STAGE_COUNT) {
+    stages.push({ targets: [] });
+  }
+
   return {
     name: oldLevel.name || "Imported Level",
-    grid: grid,
+    baseGrid: baseGrid,
+    stages: stages,
   };
 }
 
@@ -574,14 +884,15 @@ function loadLevelsFromStorage() {
   if (levels.length === 0) {
     // Create a default level
     const defaultLevel = createEmptyLevel("Level 1");
-    const row0 = defaultLevel.grid[0];
-    const row3 = defaultLevel.grid[3];
-    const row2 = defaultLevel.grid[2];
-    const row1 = defaultLevel.grid[1];
+    const row0 = defaultLevel.baseGrid[0];
+    const row3 = defaultLevel.baseGrid[3];
     if (row0) row0[5] = "R"; // Red at top right
     if (row3) row3[2] = "B"; // Blue at middle left
-    if (row2) row2[5] = "T"; // Target
-    if (row1) row1[1] = "T"; // Target
+    // Add targets to stage 1
+    if (defaultLevel.stages[0]) {
+      defaultLevel.stages[0].targets.push({ x: 5, y: 2 }); // Target
+      defaultLevel.stages[0].targets.push({ x: 1, y: 1 }); // Target
+    }
     levels.push(defaultLevel);
     saveLevelsToStorage();
   }
@@ -595,3 +906,4 @@ function loadLevelsFromStorage() {
 draw();
 updateStats();
 loadLevelsFromStorage();
+updateValidationUI();

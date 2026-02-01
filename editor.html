@@ -111,12 +111,33 @@
             background: #252525;
             border-radius: 8px;
             padding: 20px;
+            position: relative;
         }
 
         #editorCanvas {
             border: 2px solid #555;
             background: #5a4a3a;
             cursor: crosshair;
+        }
+
+        .validation-message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(196, 68, 68, 0.9);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 14px;
+            pointer-events: none;
+            display: none;
+            z-index: 10;
+        }
+
+        .validation-message.visible {
+            display: block;
         }
 
         .levels-panel {
@@ -297,6 +318,36 @@
         .legend-blue { background: #4444c4; }
         .legend-green { background: #4CAF50; }
         .legend-wall { background: #aaaaaa; }
+
+        .stage-selector {
+            display: flex;
+            gap: 5px;
+            background: #2a2a2a;
+            border-radius: 6px;
+            padding: 10px;
+            border: 1px solid #444;
+        }
+
+        .stage-btn {
+            flex: 1;
+            padding: 8px 10px;
+            background: #444;
+            border: 2px solid transparent;
+            border-radius: 4px;
+            color: #fff;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .stage-btn:hover {
+            background: #555;
+        }
+
+        .stage-btn.active {
+            background: #4CAF50;
+            border-color: #66ff66;
+        }
     </style>
 </head>
 <body>
@@ -368,6 +419,7 @@
 
         <div class="canvas-container">
             <canvas id="editorCanvas" width="600" height="600"></canvas>
+            <div class="validation-message" id="validationMessage">Target unreachable</div>
         </div>
 
         <div class="levels-panel">
@@ -380,6 +432,13 @@
 
             <div class="level-list" id="levelList">
                 <!-- Level items will be inserted here -->
+            </div>
+
+            <h3>Stages</h3>
+            <div class="stage-selector">
+                <button class="stage-btn active" data-stage="0">Stage 1</button>
+                <button class="stage-btn" data-stage="1">Stage 2</button>
+                <button class="stage-btn" data-stage="2">Stage 3</button>
             </div>
 
             <div class="level-info">

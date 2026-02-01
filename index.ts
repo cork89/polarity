@@ -6,7 +6,9 @@ const ctx = canvas.getContext("2d")!;
 const scoreFont = document.getElementById("scoreFont") as HTMLSpanElement | null;
 const timerFont = document.getElementById("timerFont") as HTMLSpanElement | null;
 const levelSelect = document.getElementById("levelSelect") as HTMLSelectElement | null;
+const gameModeSelect = document.getElementById("gameModeSelect") as HTMLSelectElement | null;
 const gameOverOverlay = document.getElementById("gameOverOverlay") as HTMLDivElement | null;
+const gameOverTitle = document.getElementById("gameOverTitle") as HTMLDivElement | null;
 const gameOverScore = document.getElementById("gameOverScore") as HTMLDivElement | null;
 
 // Game settings
@@ -16,6 +18,11 @@ const PLAYER_SIZE = 40;
 const TARGET_SIZE = 35;
 const ATTRACTOR_SIZE = 35;
 const GRAVITY = 0.1;
+
+// Game modes
+type GameMode = "timeAttack" | "sprint";
+const SPRINT_TARGET_SCORE = 250;
+const TIME_ATTACK_DURATION = 30;
 
 // Colors
 const COLOR_BACKGROUND = "#5a4a3a";
@@ -49,10 +56,17 @@ function updateTimerFont(value: number) {
   updateFontDisplay(timerFont, value, 2);
 }
 
-// Level data interface (new compact grid format)
+// Stage data structure
+interface StageData {
+  targets: { x: number; y: number }[];
+}
+
+// Level data interface (supports both old single-grid and new multi-stage formats)
 interface LevelData {
   name: string;
-  grid: string[][];
+  grid?: string[][]; // Old format
+  baseGrid?: string[][]; // New format - base layout (player, magnets, walls)
+  stages?: StageData[]; // New format - array of stages with targets
 }
 
 // Type definitions
@@ -104,6 +118,8 @@ let timeRemaining = 30;
 let isGameOver = false;
 let gameStartTime = Date.now();
 let lastTimerUpdate = Date.now();
+let currentGameMode: GameMode = "timeAttack";
+let sprintTimeElapsed = 0;
 
 // Player object
 const player: Player = {
@@ -128,6 +144,9 @@ let walls: Wall[] = [];
 
 // Current level info
 let currentLevelName: string | null = null;
+let currentLevelData: LevelData | null = null;
+let currentStageIndex = 0;
+let totalStages = 0;
 
 // Convert grid coordinates to pixel coordinates
 function gridToPixel(gridX: number, gridY: number): { x: number; y: number } {
@@ -145,7 +164,7 @@ function parseGrid(grid: string[][]) {
   const blues: Attractor[] = [];
   const targs: Target[] = [];
   const wallList: Wall[] = [];
-  
+
   for (let y = 0; y < GRID_SIZE; y++) {
     const row = grid[y];
     if (!row) continue;
@@ -171,32 +190,89 @@ function parseGrid(grid: string[][]) {
       }
     }
   }
-  
+
   return { playerX, playerY, reds, blues, targs, wallList };
 }
 
+// Normalize level data - convert both old and new formats to a usable grid
+// For multi-stage levels, merges baseGrid with current stage targets
+function normalizeLevelData(levelData: LevelData, stageIndex: number = 0): string[][] | null {
+  // Old format: just return the grid
+  if (levelData.grid) {
+    return levelData.grid;
+  }
+
+  // New format: merge baseGrid with stage targets
+  if (levelData.baseGrid && levelData.stages && levelData.stages.length > 0) {
+    const baseGrid = levelData.baseGrid;
+    const stage = levelData.stages[stageIndex];
+    if (!stage) return null;
+
+    // Create a copy of baseGrid
+    const mergedGrid: string[][] = baseGrid.map(row => [...row]);
+
+    // Add targets from this stage
+    for (const target of stage.targets) {
+      const y = target.y;
+      const x = target.x;
+      if (y !== undefined && x !== undefined && y >= 0 && y < GRID_SIZE && x >= 0 && x < GRID_SIZE) {
+        const row = mergedGrid[y];
+        if (row) {
+          row[x] = "T";
+        }
+      }
+    }
+
+    return mergedGrid;
+  }
+
+  return null;
+}
+
 // Load level from data
-function loadLevel(levelData: LevelData) {
-  // Reset game state
-  score = 0;
-  updateScoreFont(0);
-  timeRemaining = 30;
+function loadLevel(levelData: LevelData, stageIndex: number = 0, resetState: boolean = true) {
+  // Store level data for stage progression
+  currentLevelData = levelData;
+  currentStageIndex = stageIndex;
+  totalStages = levelData.stages?.length || 1;
+
+  // Normalize level data to a grid
+  const grid = normalizeLevelData(levelData, stageIndex);
+  if (!grid) {
+    console.error("Failed to load level: invalid level data");
+    return;
+  }
+
+  // Reset game state on initial load, preserve on stage progression
+  if (resetState) {
+    score = 0;
+    updateScoreFont(0);
+    if (currentGameMode === "sprint") {
+      sprintTimeElapsed = 0;
+      updateTimerFont(0);
+    } else {
+      timeRemaining = TIME_ATTACK_DURATION;
+      updateTimerFont(TIME_ATTACK_DURATION);
+    }
+    player.vx = 0;
+    player.vy = 0;
+    player.trail = [];
+  }
+
   isGameOver = false;
   lastTimerUpdate = Date.now();
-  updateTimerFont(30);
   particles = [];
-  player.vx = 0;
-  player.vy = 0;
-  player.trail = [];
   player.hasAttracted = false;
 
   // Parse the grid
-  const { playerX, playerY, reds, blues, targs, wallList } = parseGrid(levelData.grid);
+  const { playerX, playerY, reds, blues, targs, wallList } = parseGrid(grid);
 
-  // Set player position
-  const playerOffset = (CELL_SIZE - PLAYER_SIZE) / 2;
-  player.x = playerX * CELL_SIZE + playerOffset;
-  player.y = playerY * CELL_SIZE + playerOffset;
+  // Only set player position on initial load, not stage progression
+  if (resetState) {
+    const playerOffset = (CELL_SIZE - PLAYER_SIZE) / 2;
+    player.x = playerX * CELL_SIZE + playerOffset;
+    player.y = playerY * CELL_SIZE + playerOffset;
+  }
 
   // Load attractors, targets, and walls
   redAttractors = reds;
@@ -255,11 +331,16 @@ function loadDefaultLevel() {
   player.trail = [];
   player.hasAttracted = false;
 
-  // Reset timer and game state
-  timeRemaining = 30;
+  // Reset timer and game state based on current mode
+  if (currentGameMode === "sprint") {
+    sprintTimeElapsed = 0;
+    updateTimerFont(0);
+  } else {
+    timeRemaining = TIME_ATTACK_DURATION;
+    updateTimerFont(TIME_ATTACK_DURATION);
+  }
   isGameOver = false;
   lastTimerUpdate = Date.now();
-  updateTimerFont(30);
 
   spawnRandomTargets();
 }
@@ -323,6 +404,17 @@ if (levelSelect) {
   });
 }
 
+// Handle game mode selection
+if (gameModeSelect) {
+  gameModeSelect.addEventListener("change", () => {
+    const mode = gameModeSelect.value as GameMode;
+    if (mode === "timeAttack" || mode === "sprint") {
+      currentGameMode = mode;
+      restartGame();
+    }
+  });
+}
+
 // Check for level in URL hash (from editor "Test in Game")
 function checkForEditorLevel() {
   const hash = window.location.hash.slice(1); // Remove #
@@ -330,7 +422,8 @@ function checkForEditorLevel() {
     try {
       const decoded = decodeURIComponent(hash);
       const data = JSON.parse(decoded);
-      if (data.level && data.level.grid) {
+      // Support both old format (level.grid) and new multi-stage format (level.baseGrid + level.stages)
+      if (data.level && (data.level.grid || (data.level.baseGrid && data.level.stages))) {
         loadLevel(data.level);
         // Remove hash to prevent reloading on refresh
         history.replaceState(null, "", window.location.pathname);
@@ -521,6 +614,11 @@ function checkCollisions() {
         score += 10;
         updateScoreFont(score);
 
+        // Check for Sprint mode win condition
+        if (currentGameMode === "sprint" && score >= SPRINT_TARGET_SCORE) {
+          isGameOver = true;
+        }
+
         // Create particles
         for (let i = 0; i < 10; i++) {
           particles.push({
@@ -541,6 +639,10 @@ function checkCollisions() {
     // Respawn random targets if in default/random mode
     if (!currentLevelName) {
       spawnRandomTargets();
+    } else if (currentLevelData && currentLevelData.stages && currentStageIndex < totalStages - 1) {
+      // Multi-stage level: advance to next stage (keep player position)
+      currentStageIndex++;
+      loadLevel(currentLevelData, currentStageIndex, false);
     }
   }
 }
@@ -670,13 +772,18 @@ function updateTimer() {
 
   const now = Date.now();
   if (now - lastTimerUpdate >= 1000) {
-    timeRemaining--;
     lastTimerUpdate = now;
 
-    updateTimerFont(timeRemaining);
+    if (currentGameMode === "timeAttack") {
+      timeRemaining--;
+      updateTimerFont(timeRemaining);
 
-    if (timeRemaining <= 0) {
-      isGameOver = true;
+      if (timeRemaining <= 0) {
+        isGameOver = true;
+      }
+    } else if (currentGameMode === "sprint") {
+      sprintTimeElapsed++;
+      updateTimerFont(sprintTimeElapsed);
     }
   }
 }
@@ -686,8 +793,19 @@ function drawGameOver() {
   if (gameOverOverlay) {
     gameOverOverlay.classList.add("visible");
   }
+  if (gameOverTitle) {
+    if (currentGameMode === "sprint") {
+      gameOverTitle.textContent = "COMPLETE!";
+    } else {
+      gameOverTitle.textContent = "GAME OVER";
+    }
+  }
   if (gameOverScore) {
-    gameOverScore.textContent = `Points earned: ${score}`;
+    if (currentGameMode === "sprint") {
+      gameOverScore.textContent = `Time: ${sprintTimeElapsed} seconds`;
+    } else {
+      gameOverScore.textContent = `Points earned: ${score}`;
+    }
   }
 }
 
@@ -701,10 +819,15 @@ function hideGameOver() {
 // Restart the game
 function restartGame() {
   isGameOver = false;
-  timeRemaining = 30;
   lastTimerUpdate = Date.now();
 
-  updateTimerFont(30);
+  if (currentGameMode === "sprint") {
+    sprintTimeElapsed = 0;
+    updateTimerFont(0);
+  } else {
+    timeRemaining = TIME_ATTACK_DURATION;
+    updateTimerFont(TIME_ATTACK_DURATION);
+  }
 
   if (currentLevelName) {
     const levels = getStoredLevels();

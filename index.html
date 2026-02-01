@@ -256,6 +256,10 @@
         </div>
     </div>
     <div class="controls">
+        <select class="level-select" id="gameModeSelect">
+            <option value="timeAttack">Time Attack</option>
+            <option value="sprint">Sprint (250 pts)</option>
+        </select>
         <select class="level-select" id="levelSelect">
             <option value="">-- Random Level --</option>
         </select>
@@ -264,9 +268,9 @@
     <div class="game-container">
         <canvas id="gameCanvas" width="600" height="600"></canvas>
         <div class="game-over-overlay" id="gameOverOverlay">
-            <div class="game-over-title">GAME OVER</div>
+            <div class="game-over-title" id="gameOverTitle">GAME OVER</div>
             <div class="game-over-score" id="gameOverScore">Points earned: 0</div>
-            <div class="game-over-hint">Press any key or SPACE to play again</div>
+            <div class="game-over-hint">Press SPACE to play again</div>
         </div>
         <div class="arcade-buttons">
             <button class="arcade-button blue" id="btnZ" aria-label="Attract to blue squares">
