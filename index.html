@@ -143,7 +143,8 @@
             -webkit-tap-highlight-color: transparent;
         }
 
-        .arcade-button:active {
+        .arcade-button:active,
+        .arcade-button.active {
             transform: translateY(4px);
             box-shadow: 
                 0 2px 0 var(--arcade-shadow-dark),
@@ -157,7 +158,8 @@
             color: white;
         }
 
-        .arcade-button.blue:active {
+        .arcade-button.blue:active,
+        .arcade-button.blue.active {
             background: linear-gradient(145deg, var(--arcade-blue-active-light), var(--arcade-blue-active-dark));
         }
 
@@ -166,7 +168,8 @@
             color: white;
         }
 
-        .arcade-button.red:active {
+        .arcade-button.red:active,
+        .arcade-button.red.active {
             background: linear-gradient(145deg, var(--arcade-red-active-light), var(--arcade-red-active-dark));
         }
 

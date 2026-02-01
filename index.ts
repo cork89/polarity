@@ -166,7 +166,7 @@ function loadLevel(levelData: LevelData) {
   if (scoreElement) {
     scoreElement.textContent = "0";
   }
-  timeRemaining = 30;
+  timeRemaining = 2000;
   isGameOver = false;
   lastTimerUpdate = Date.now();
   if (timerElement) {
@@ -245,7 +245,7 @@ function loadDefaultLevel() {
   player.hasAttracted = false;
 
   // Reset timer and game state
-  timeRemaining = 30;
+  timeRemaining = 2000;
   isGameOver = false;
   lastTimerUpdate = Date.now();
   if (timerElement) {
@@ -341,13 +341,25 @@ function checkForEditorLevel() {
 const keys = { x: false, z: false };
 
 document.addEventListener("keydown", (e) => {
-  if (e.key.toLowerCase() === "x") keys.x = true;
-  if (e.key.toLowerCase() === "z") keys.z = true;
+  if (e.key.toLowerCase() === "x") {
+    keys.x = true;
+    btnX?.classList.add("active");
+  }
+  if (e.key.toLowerCase() === "z") {
+    keys.z = true;
+    btnZ?.classList.add("active");
+  }
 });
 
 document.addEventListener("keyup", (e) => {
-  if (e.key.toLowerCase() === "x") keys.x = false;
-  if (e.key.toLowerCase() === "z") keys.z = false;
+  if (e.key.toLowerCase() === "x") {
+    keys.x = false;
+    btnX?.classList.remove("active");
+  }
+  if (e.key.toLowerCase() === "z") {
+    keys.z = false;
+    btnZ?.classList.remove("active");
+  }
 });
 
 // Arcade button handling
