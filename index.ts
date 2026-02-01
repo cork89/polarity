@@ -148,6 +148,39 @@ let currentLevelData: LevelData | null = null;
 let currentStageIndex = 0;
 let totalStages = 0;
 
+// Sound effects
+const blueSound = new Audio("synth1.ogg");
+const redSound = new Audio("synth2.ogg");
+const collectSound = new Audio("coingather.ogg");
+blueSound.loop = true;
+redSound.loop = true;
+blueSound.volume = 0.2;
+redSound.volume = 0.2;
+collectSound.volume = 0.3;
+
+// Sound fade out tracking
+const FADE_DURATION = 150; // milliseconds to fade out
+const MAX_VOLUME = 0.2;
+let blueFadeStartTime: number | null = null;
+let redFadeStartTime: number | null = null;
+
+function fadeAudio(sound: HTMLAudioElement, fadeStartTime: number | null, currentTime: number): number | null {
+  if (fadeStartTime === null) return null;
+  
+  const elapsed = currentTime - fadeStartTime;
+  const progress = Math.min(elapsed / FADE_DURATION, 1);
+  
+  sound.volume = MAX_VOLUME * (1 - progress);
+  
+  if (progress >= 1) {
+    sound.pause();
+    sound.volume = MAX_VOLUME;
+    return null;
+  }
+  
+  return fadeStartTime;
+}
+
 // Convert grid coordinates to pixel coordinates
 function gridToPixel(gridX: number, gridY: number): { x: number; y: number } {
   const padding = (CELL_SIZE - TARGET_SIZE) / 2;
@@ -292,28 +325,77 @@ function loadLevel(levelData: LevelData, stageIndex: number = 0, resetState: boo
   currentLevelName = levelData.name;
 }
 
+// Check if target position overlaps with a wall or magnet
+function isValidTargetPosition(x: number, y: number): boolean {
+  // Check walls
+  for (const wall of walls) {
+    if (
+      x < wall.x + CELL_SIZE &&
+      x + TARGET_SIZE > wall.x &&
+      y < wall.y + CELL_SIZE &&
+      y + TARGET_SIZE > wall.y
+    ) {
+      return false;
+    }
+  }
+
+  // Check red attractors
+  for (const attractor of redAttractors) {
+    if (
+      x < attractor.x + ATTRACTOR_SIZE &&
+      x + TARGET_SIZE > attractor.x &&
+      y < attractor.y + ATTRACTOR_SIZE &&
+      y + TARGET_SIZE > attractor.y
+    ) {
+      return false;
+    }
+  }
+
+  // Check blue attractors
+  for (const attractor of blueAttractors) {
+    if (
+      x < attractor.x + ATTRACTOR_SIZE &&
+      x + TARGET_SIZE > attractor.x &&
+      y < attractor.y + ATTRACTOR_SIZE &&
+      y + TARGET_SIZE > attractor.y
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 // Spawn random targets (fallback for no level)
 function spawnRandomTargets() {
   targets = [];
   // Spawn green squares along the right edge
   for (let i = 0; i < GRID_SIZE; i++) {
     if (Math.random() > 0.5) {
-      targets.push({
-        x: CELL_SIZE * 5 + (CELL_SIZE - TARGET_SIZE) / 2,
-        y: CELL_SIZE * i + (CELL_SIZE - TARGET_SIZE) / 2,
-        collected: false,
-      });
+      const targetX = CELL_SIZE * 5 + (CELL_SIZE - TARGET_SIZE) / 2;
+      const targetY = CELL_SIZE * i + (CELL_SIZE - TARGET_SIZE) / 2;
+      if (isValidTargetPosition(targetX, targetY)) {
+        targets.push({
+          x: targetX,
+          y: targetY,
+          collected: false,
+        });
+      }
     }
   }
   // Also spawn some elsewhere
   for (let i = 0; i < 3; i++) {
     const gridX = Math.floor(Math.random() * 4);
     const gridY = Math.floor(Math.random() * GRID_SIZE);
-    targets.push({
-      x: CELL_SIZE * gridX + (CELL_SIZE - TARGET_SIZE) / 2,
-      y: CELL_SIZE * gridY + (CELL_SIZE - TARGET_SIZE) / 2,
-      collected: false,
-    });
+    const targetX = CELL_SIZE * gridX + (CELL_SIZE - TARGET_SIZE) / 2;
+    const targetY = CELL_SIZE * gridY + (CELL_SIZE - TARGET_SIZE) / 2;
+    if (isValidTargetPosition(targetX, targetY)) {
+      targets.push({
+        x: targetX,
+        y: targetY,
+        collected: false,
+      });
+    }
   }
 }
 
@@ -368,6 +450,12 @@ function getStoredLevels(): LevelData[] {
   return [];
 }
 
+// Get display name with game mode tag
+function getLevelDisplayName(level: LevelData): string {
+  const modeTag = level.gameMode ? `[${level.gameMode}]` : "[staged]";
+  return `${level.name} ${modeTag}`;
+}
+
 // Populate level selector
 function populateLevelSelector() {
   if (!levelSelect) return;
@@ -381,7 +469,7 @@ function populateLevelSelector() {
   levels.forEach((level, index) => {
     const option = document.createElement("option");
     option.value = String(index);
-    option.textContent = level.name;
+    option.textContent = getLevelDisplayName(level);
     levelSelect.appendChild(option);
   });
 
@@ -612,6 +700,10 @@ function checkCollisions() {
         score += 10;
         updateScoreFont(score);
 
+        // Play collection sound
+        collectSound.currentTime = 0;
+        collectSound.play().catch(() => {});
+
         // Check for Sprint mode win condition
         if (currentGameMode === "sprint" && score >= SPRINT_TARGET_SCORE) {
           isGameOver = true;
@@ -642,8 +734,8 @@ function checkCollisions() {
 
   // Check if all targets collected
   if (targets.every((t) => t.collected)) {
-    // Respawn random targets if in default/random mode
-    if (!currentLevelName) {
+    // Respawn random targets for timeAttack/sprint modes or default/random mode
+    if (!currentLevelName || currentGameMode === "timeAttack" || currentGameMode === "sprint") {
       spawnRandomTargets();
     } else if (currentLevelData && currentLevelData.stages && currentStageIndex < totalStages - 1) {
       // Multi-stage level: advance to next stage (keep player position)
@@ -800,14 +892,14 @@ function drawGameOver() {
     gameOverOverlay.classList.add("visible");
   }
   if (gameOverTitle) {
-    if (currentGameMode === "sprint") {
+    if (currentGameMode === "sprint" || currentGameMode === "staged") {
       gameOverTitle.textContent = "COMPLETE!";
     } else {
       gameOverTitle.textContent = "GAME OVER";
     }
   }
   if (gameOverScore) {
-    if (currentGameMode === "sprint") {
+    if (currentGameMode === "sprint" || currentGameMode === "staged") {
       gameOverScore.textContent = `Time: ${sprintTimeElapsed} seconds`;
     } else {
       gameOverScore.textContent = `Points earned: ${score}`;
@@ -853,6 +945,47 @@ function restartGame() {
 
 // Main game loop
 function gameLoop() {
+  // Update sound effects based on connection state
+  const now = Date.now();
+  
+  if (!isGameOver) {
+    if (keys.z) {
+      if (blueSound.paused) {
+        blueSound.volume = MAX_VOLUME;
+        blueSound.play().catch(() => {});
+      }
+      blueFadeStartTime = null;
+    } else {
+      if (!blueSound.paused && blueFadeStartTime === null) {
+        blueFadeStartTime = now;
+      }
+    }
+    
+    if (keys.x) {
+      if (redSound.paused) {
+        redSound.volume = MAX_VOLUME;
+        redSound.play().catch(() => {});
+      }
+      redFadeStartTime = null;
+    } else {
+      if (!redSound.paused && redFadeStartTime === null) {
+        redFadeStartTime = now;
+      }
+    }
+  } else {
+    // Start fade out when game is over
+    if (!blueSound.paused && blueFadeStartTime === null) {
+      blueFadeStartTime = now;
+    }
+    if (!redSound.paused && redFadeStartTime === null) {
+      redFadeStartTime = now;
+    }
+  }
+  
+  // Apply fade out
+  blueFadeStartTime = fadeAudio(blueSound, blueFadeStartTime, now);
+  redFadeStartTime = fadeAudio(redSound, redFadeStartTime, now);
+
   // Clear canvas
   ctx.fillStyle = COLOR_BACKGROUND;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
