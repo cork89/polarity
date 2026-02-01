@@ -7,6 +7,8 @@ const scoreCanvas = document.getElementById("scoreCanvas") as HTMLCanvasElement;
 const scoreCtx = scoreCanvas?.getContext("2d");
 const timerCanvas = document.getElementById("timerCanvas") as HTMLCanvasElement;
 const timerCtx = timerCanvas?.getContext("2d");
+const scoreFont = document.getElementById("scoreFont") as HTMLSpanElement | null;
+const timerFont = document.getElementById("timerFont") as HTMLSpanElement | null;
 const levelSelect = document.getElementById("levelSelect") as HTMLSelectElement | null;
 const gameOverOverlay = document.getElementById("gameOverOverlay") as HTMLDivElement | null;
 const gameOverScore = document.getElementById("gameOverScore") as HTMLDivElement | null;
@@ -120,6 +122,20 @@ function drawSevenSegmentNumber(ctx: CanvasRenderingContext2D, value: number, ma
     const y = 5;
     drawDigit(ctx, digit, x, y, digitWidth - DIGIT_SPACING, digitHeight);
   }
+}
+
+// Update font-based displays
+function updateFontDisplay(element: HTMLSpanElement | null, value: number, maxDigits: number) {
+  if (!element) return;
+  element.textContent = Math.floor(value).toString().padStart(maxDigits, " ");
+}
+
+function updateScoreFont(value: number) {
+  updateFontDisplay(scoreFont, value, 5);
+}
+
+function updateTimerFont(value: number) {
+  updateFontDisplay(timerFont, value, 2);
 }
 
 // Level data interface (new compact grid format)
@@ -255,12 +271,14 @@ function loadLevel(levelData: LevelData) {
   if (scoreCtx) {
     drawSevenSegmentNumber(scoreCtx, 0, 5);
   }
+  updateScoreFont(0);
   timeRemaining = 30;
   isGameOver = false;
   lastTimerUpdate = Date.now();
   if (timerCtx) {
     drawSevenSegmentNumber(timerCtx, 30, 5);
   }
+  updateTimerFont(30);
   particles = [];
   player.vx = 0;
   player.vy = 0;
@@ -339,6 +357,7 @@ function loadDefaultLevel() {
   if (timerCtx) {
     drawSevenSegmentNumber(timerCtx, 30, 5);
   }
+  updateTimerFont(30);
 
   spawnRandomTargets();
 }
@@ -400,6 +419,7 @@ if (levelSelect) {
       if (scoreCtx) {
         drawSevenSegmentNumber(scoreCtx, 0, 5);
       }
+      updateScoreFont(0);
     }
   });
 }
@@ -603,6 +623,7 @@ function checkCollisions() {
         if (scoreCtx) {
             drawSevenSegmentNumber(scoreCtx, score, 5);
         }
+        updateScoreFont(score);
 
         // Create particles
         for (let i = 0; i < 10; i++) {
@@ -759,6 +780,7 @@ function updateTimer() {
     if (timerCtx) {
       drawSevenSegmentNumber(timerCtx, timeRemaining, 5);
     }
+    updateTimerFont(timeRemaining);
 
     if (timeRemaining <= 0) {
       isGameOver = true;
@@ -792,6 +814,7 @@ function restartGame() {
   if (timerCtx) {
     drawSevenSegmentNumber(timerCtx, 30, 5);
   }
+  updateTimerFont(30);
 
   if (currentLevelName) {
     const levels = getStoredLevels();
@@ -809,6 +832,7 @@ function restartGame() {
   if (scoreCtx) {
     drawSevenSegmentNumber(scoreCtx, 0, 5);
   }
+  updateScoreFont(0);
 }
 
 // Main game loop

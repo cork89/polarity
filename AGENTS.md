@@ -6,8 +6,10 @@
 # Install dependencies
 bun install
 
-# Run the game (opens index.html in browser - use a local server)
-bun run index.ts
+# Run the game server (properly serves fonts and static files)
+bun run dev
+# or
+bun run start
 
 # Type check TypeScript
 bun tsc --noEmit
@@ -82,6 +84,7 @@ const cell = row[x];
 ├── index.html      # Game HTML
 ├── editor.ts       # Level editor logic
 ├── editor.html     # Editor HTML
+├── server.ts       # Bun dev server (serves fonts correctly)
 ├── package.json    # Bun dependencies
 └── tsconfig.json   # TypeScript config
 ```

@@ -3,6 +3,10 @@
   "module": "index.ts",
   "type": "module",
   "private": true,
+  "scripts": {
+    "dev": "bun server.ts",
+    "start": "bun server.ts"
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },
