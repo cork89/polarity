@@ -265,6 +265,7 @@ function updateEditorForGameMode() {
   draw();
   updateStats();
   updateValidationUI();
+  updateGameModeDescription();
 }
 
 // Update UI based on validation state
@@ -280,16 +281,14 @@ function updateValidationUI() {
     saveBtn.disabled = true;
     saveBtn.style.opacity = "0.5";
     saveBtn.style.cursor = "not-allowed";
-    canvas.style.border = "4px solid #c44444";
-    canvas.style.borderRadius = "4px";
+    canvas.classList.add("invalid");
     validationMessage.classList.add("visible");
     validationMessage.textContent = validation.error || "Invalid level";
   } else {
     saveBtn.disabled = false;
     saveBtn.style.opacity = "1";
     saveBtn.style.cursor = "pointer";
-    canvas.style.border = "2px solid #555";
-    canvas.style.borderRadius = "0";
+    canvas.classList.remove("invalid");
     validationMessage.classList.remove("visible");
   }
 }
@@ -549,6 +548,45 @@ editorCanvas.addEventListener("click", (e) => {
   placeObject(gridPos.gridX, gridPos.gridY);
 });
 
+// Touch handling for mobile
+editorCanvas.addEventListener(
+  "touchstart",
+  (e) => {
+    e.preventDefault();
+    const touch = e.touches[0];
+    if (!touch) return;
+    const rect = editorCanvas.getBoundingClientRect();
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+    hoveredCell = pixelToGrid(x, y);
+    draw();
+  },
+  { passive: false },
+);
+
+editorCanvas.addEventListener(
+  "touchmove",
+  (e) => {
+    e.preventDefault();
+    const touch = e.touches[0];
+    if (!touch) return;
+    const rect = editorCanvas.getBoundingClientRect();
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+    hoveredCell = pixelToGrid(x, y);
+    draw();
+  },
+  { passive: false },
+);
+
+editorCanvas.addEventListener("touchend", (e) => {
+  if (hoveredCell) {
+    placeObject(hoveredCell.gridX, hoveredCell.gridY);
+  }
+  hoveredCell = null;
+  draw();
+});
+
 // Tool selection
 document.querySelectorAll(".tool-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
@@ -575,11 +613,27 @@ document.querySelectorAll(".stage-btn").forEach((btn) => {
   });
 });
 
+// Game mode descriptions
+const GAME_MODE_DESCRIPTIONS: Record<string, string> = {
+  staged: "Complete 3 stages by collecting all targets in each stage",
+  timeAttack: "Collect as many auto-spawned targets as you can in 30 seconds",
+  sprint: "Race to collect 250 points worth of auto-spawned targets",
+};
+
+// Update game mode description
+function updateGameModeDescription() {
+  const descriptionEl = document.getElementById("gameModeDescription");
+  if (descriptionEl) {
+    descriptionEl.textContent = GAME_MODE_DESCRIPTIONS[currentLevel.gameMode] || "";
+  }
+}
+
 // Game mode selection
 document.getElementById("gameModeSelect")?.addEventListener("change", (e) => {
   const select = e.target as HTMLSelectElement;
   const newMode = select.value as "timeAttack" | "sprint" | "staged";
   currentLevel.gameMode = newMode;
+  updateGameModeDescription();
   updateEditorForGameMode();
 });
 
@@ -630,17 +684,25 @@ function countObjects(): {
 
 // Update statistics display
 function updateStats() {
-  document.getElementById("currentLevelName")!.textContent = currentLevel.name;
+  const currentLevelName = document.getElementById("currentLevelName");
+  const redCount = document.getElementById("redCount");
+  const blueCount = document.getElementById("blueCount");
+  const targetCount = document.getElementById("targetCount");
+  const wallCount = document.getElementById("wallCount");
+
+  if (currentLevelName) currentLevelName.textContent = currentLevel.name;
   const counts = countObjects();
-  document.getElementById("redCount")!.textContent = String(counts.red);
-  document.getElementById("blueCount")!.textContent = String(counts.blue);
-  document.getElementById("targetCount")!.textContent = String(counts.targets);
-  document.getElementById("wallCount")!.textContent = String(counts.walls);
+  if (redCount) redCount.textContent = String(counts.red);
+  if (blueCount) blueCount.textContent = String(counts.blue);
+  if (targetCount) targetCount.textContent = String(counts.targets);
+  if (wallCount) wallCount.textContent = String(counts.walls);
 }
 
 // Level list management
 function renderLevelList() {
-  const listEl = document.getElementById("levelList")!;
+  const listEl = document.getElementById("levelList");
+  if (!listEl) return;
+
   listEl.innerHTML = "";
 
   levels.forEach((level, index) => {
@@ -785,205 +847,6 @@ document.getElementById("saveBtn")!.addEventListener("click", () => {
   alert("Level saved! Ready to create the next level.");
 });
 
-// Export to JSON (new compact format)
-document.getElementById("exportBtn")!.addEventListener("click", () => {
-  const data = {
-    levels: [currentLevel],
-  };
-  const json = JSON.stringify(data, null, 2);
-  const blob = new Blob([json], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${currentLevel.name
-    .replace(/[^a-z0-9]/gi, "_")
-    .toLowerCase()}.json`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-});
-
-// Import from JSON (handles both old and new multi-stage formats)
-document.getElementById("importBtn")!.addEventListener("change", (e) => {
-  const input = e.target as HTMLInputElement;
-  const file = input.files?.[0];
-  if (!file) return;
-
-  const reader = new FileReader();
-  reader.onload = (event) => {
-    try {
-      const data = JSON.parse(event.target?.result as string);
-
-      if (data.levels && Array.isArray(data.levels) && data.levels.length > 0) {
-        // Import all levels
-        const importedLevels: Level[] = [];
-
-        data.levels.forEach((levelData: any) => {
-          let level: Level;
-
-          // Check if it's the new multi-stage format (has 'baseGrid' property)
-          if (levelData.baseGrid && Array.isArray(levelData.baseGrid)) {
-            level = {
-              name: levelData.name || "Imported Level",
-              gameMode: levelData.gameMode || "staged",
-              baseGrid: levelData.baseGrid as GridCell[][],
-              stages: levelData.stages || [{ targets: [] }],
-            };
-          } else if (levelData.grid && Array.isArray(levelData.grid)) {
-            // Convert old single-grid format to multi-stage format
-            level = convertSingleGridToMultiStage(levelData);
-          } else if (levelData.playerGridX !== undefined) {
-            // Convert old format to new format
-            level = convertOldFormatToNew(levelData);
-          } else {
-            // Unknown format, skip
-            console.warn("Unknown level format:", levelData);
-            return;
-          }
-
-          importedLevels.push(level);
-        });
-
-        if (importedLevels.length > 0 && importedLevels[0]) {
-          // Add all imported levels
-          importedLevels.forEach((level) => levels.push(level));
-          saveLevelsToStorage();
-          loadLevel(importedLevels[0]);
-          alert(`Imported ${importedLevels.length} level(s)!`);
-        } else {
-          alert("No valid levels found in file");
-        }
-      } else {
-        alert("Invalid level file format");
-      }
-    } catch (err) {
-      alert("Error reading file: " + err);
-    }
-    input.value = ""; // Reset input
-  };
-  reader.readAsText(file);
-});
-
-// Convert single-grid format to multi-stage format
-function convertSingleGridToMultiStage(levelData: any): Level {
-  const baseGrid: GridCell[][] = [];
-  const targets: { x: number; y: number }[] = [];
-
-  for (let y = 0; y < GRID_SIZE; y++) {
-    const row: GridCell[] = [];
-    const sourceRow = levelData.grid[y];
-    for (let x = 0; x < GRID_SIZE; x++) {
-      const cell = sourceRow ? sourceRow[x] : " ";
-      if (cell === "T") {
-        // Collect targets separately
-        targets.push({ x, y });
-        row.push(" ");
-      } else {
-        row.push(cell);
-      }
-    }
-    baseGrid.push(row);
-  }
-
-  // Create single stage with all targets
-  const stages: Stage[] = [{ targets }];
-  // Add empty stages to reach default count
-  while (stages.length < DEFAULT_STAGE_COUNT) {
-    stages.push({ targets: [] });
-  }
-
-  return {
-    name: levelData.name || "Imported Level",
-    gameMode: levelData.gameMode || "staged",
-    baseGrid: baseGrid,
-    stages: stages,
-  };
-}
-
-// Convert old level format to new multi-stage format
-function convertOldFormatToNew(oldLevel: any): Level {
-  const baseGrid: GridCell[][] = [];
-  for (let y = 0; y < GRID_SIZE; y++) {
-    const row: GridCell[] = [];
-    for (let x = 0; x < GRID_SIZE; x++) {
-      row.push(" ");
-    }
-    baseGrid.push(row);
-  }
-
-  // Place player
-  if (
-    oldLevel.playerGridX !== undefined &&
-    oldLevel.playerGridY !== undefined
-  ) {
-    const playerRow = baseGrid[oldLevel.playerGridY];
-    if (playerRow) {
-      playerRow[oldLevel.playerGridX] = "P";
-    }
-  }
-
-  // Place red attractors
-  if (oldLevel.redAttractors && Array.isArray(oldLevel.redAttractors)) {
-    oldLevel.redAttractors.forEach((a: any) => {
-      if (isValidGridPos(a.gridX, a.gridY)) {
-        const row = baseGrid[a.gridY];
-        if (row) {
-          row[a.gridX] = "R";
-        }
-      }
-    });
-  }
-
-  // Place blue attractors
-  if (oldLevel.blueAttractors && Array.isArray(oldLevel.blueAttractors)) {
-    oldLevel.blueAttractors.forEach((a: any) => {
-      if (isValidGridPos(a.gridX, a.gridY)) {
-        const row = baseGrid[a.gridY];
-        if (row) {
-          row[a.gridX] = "B";
-        }
-      }
-    });
-  }
-
-  // Place walls
-  if (oldLevel.walls && Array.isArray(oldLevel.walls)) {
-    oldLevel.walls.forEach((w: any) => {
-      if (isValidGridPos(w.gridX, w.gridY)) {
-        const row = baseGrid[w.gridY];
-        if (row) {
-          row[w.gridX] = "W";
-        }
-      }
-    });
-  }
-
-  // Create stages from targets
-  const stages: Stage[] = [];
-  if (oldLevel.targets && Array.isArray(oldLevel.targets)) {
-    const targets = oldLevel.targets.map((t: any) => ({
-      x: t.gridX,
-      y: t.gridY,
-    }));
-    stages.push({ targets });
-  } else {
-    stages.push({ targets: [] });
-  }
-
-  // Add empty stages to reach default count
-  while (stages.length < DEFAULT_STAGE_COUNT) {
-    stages.push({ targets: [] });
-  }
-
-  return {
-    name: oldLevel.name || "Imported Level",
-    gameMode: oldLevel.gameMode || "staged",
-    baseGrid: baseGrid,
-    stages: stages,
-  };
-}
-
 // Test in game
 document.getElementById("testBtn")!.addEventListener("click", () => {
   const data = {
@@ -991,7 +854,7 @@ document.getElementById("testBtn")!.addEventListener("click", () => {
   };
   const json = JSON.stringify(data);
   const encoded = encodeURIComponent(json);
-  window.open(`index.html#${encoded}`, "_blank");
+  window.open(`play.html#${encoded}`, "_blank");
 });
 
 // LocalStorage management

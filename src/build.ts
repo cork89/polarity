@@ -8,6 +8,7 @@ Bun.build({
     "synth1.ogg",
     "synth2.ogg",
     "DSEG7ClassicMini-Bold.woff2",
+    "polaritypenguin.webp",
   ],
 });
 

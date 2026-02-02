@@ -4,6 +4,55 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Document</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        min-height: 100vh;
+        background-image: url("polaritypenguin.webp");
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 20px;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      }
+
+      button {
+        padding: 15px 50px;
+        font-size: 24px;
+        font-weight: bold;
+        text-transform: uppercase;
+        letter-spacing: 3px;
+        border: 2px solid #00ffff;
+        background: rgba(0, 20, 40, 0.8);
+        color: #00ffff;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        border-radius: 8px;
+        box-shadow: 0 0 10px rgba(0, 255, 255, 0.5),
+          inset 0 0 10px rgba(0, 255, 255, 0.1);
+      }
+
+      button:hover {
+        background: #00ffff;
+        color: #001529;
+        box-shadow: 0 0 30px rgba(0, 255, 255, 0.8),
+          0 0 60px rgba(0, 255, 255, 0.4);
+        transform: scale(1.05);
+      }
+
+      button:active {
+        transform: scale(0.98);
+      }
+    </style>
   </head>
   <body>
     <button id="play">Play</button>

@@ -258,6 +258,29 @@
         color: #aaaaaa;
         font-size: 18px;
       }
+
+      .game-over-button {
+        padding: 12px 24px;
+        font-size: 18px;
+        font-weight: bold;
+        background: var(--arcade-blue-light);
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        box-shadow: 0 4px 0 var(--arcade-blue-dark);
+        transition: all 0.1s ease;
+        margin-top: 10px;
+      }
+
+      .game-over-button:hover {
+        background: var(--arcade-blue-active-light);
+      }
+
+      .game-over-button:active {
+        transform: translateY(4px);
+        box-shadow: 0 0 0 var(--arcade-blue-dark);
+      }
     </style>
   </head>
   <body>
@@ -283,6 +306,7 @@
         <div class="game-over-title" id="gameOverTitle">GAME OVER</div>
         <div class="game-over-score" id="gameOverScore">Points earned: 0</div>
         <div class="game-over-hint">Press SPACE to play again</div>
+        <button class="game-over-button" id="gameOverButton">Play Again</button>
       </div>
       <div class="arcade-buttons">
         <button

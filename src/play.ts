@@ -21,6 +21,9 @@ const gameOverTitle = document.getElementById(
 const gameOverScore = document.getElementById(
   "gameOverScore",
 ) as HTMLDivElement | null;
+const gameOverButton = document.getElementById(
+  "gameOverButton",
+) as HTMLButtonElement | null;
 
 // Game settings
 const GRID_SIZE = 6;
@@ -622,6 +625,15 @@ document.addEventListener("keydown", (e) => {
     restartGame();
   }
 });
+
+// Restart game on button click when game over
+if (gameOverButton) {
+  gameOverButton.addEventListener("click", () => {
+    if (isGameOver) {
+      restartGame();
+    }
+  });
+}
 
 // Physics
 function applyAttraction() {
