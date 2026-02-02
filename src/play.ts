@@ -25,10 +25,10 @@ const gameOverScore = document.getElementById(
 // Game settings
 const GRID_SIZE = 6;
 const CELL_SIZE = gameCanvas.width / GRID_SIZE;
-const PLAYER_SIZE = 40;
-const TARGET_SIZE = 35;
-const ATTRACTOR_SIZE = 35;
-const GRAVITY = 0.1;
+const PLAYER_SIZE = 25;
+const TARGET_SIZE = 22;
+const ATTRACTOR_SIZE = 22;
+const GRAVITY = 0.0625;
 
 // Game modes
 type GameMode = "timeAttack" | "sprint" | "staged";
@@ -640,7 +640,7 @@ function applyAttraction() {
     const dist = Math.sqrt(dx * dx + dy * dy);
 
     if (dist > 10) {
-      const force = 800 / (dist * dist + 100);
+      const force = 400 / (dist * dist + 200);
       // Accumulate velocity towards magnets without any damping
       player.vx += (dx / dist) * force;
       player.vy += (dy / dist) * force;

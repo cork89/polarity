@@ -92,7 +92,7 @@ currentLevel = createEmptyLevel();
 
 // Convert grid coordinates to pixel coordinates
 function gridToPixel(gridX: number, gridY: number): { x: number; y: number } {
-  const padding = (CELL_SIZE - 35) / 2; // 35 is the target/attractor size
+  const padding = (CELL_SIZE - 22) / 2; // 22 is the target/attractor size
   return {
     x: gridX * CELL_SIZE + padding,
     y: gridY * CELL_SIZE + padding,
@@ -409,7 +409,7 @@ function drawCellHighlight(gridX: number, gridY: number) {
 }
 
 function drawPlayer(gridX: number, gridY: number) {
-  const size = 40;
+  const size = 25;
   const offset = (CELL_SIZE - size) / 2;
 
   editorCtx.fillStyle = "#666";
@@ -432,25 +432,25 @@ function drawPlayer(gridX: number, gridY: number) {
 function drawRedAttractor(gridX: number, gridY: number) {
   const pos = gridToPixel(gridX, gridY);
   editorCtx.fillStyle = "#c44444";
-  editorCtx.fillRect(pos.x, pos.y, 35, 35);
+  editorCtx.fillRect(pos.x, pos.y, 22, 22);
   editorCtx.fillStyle = "#ff6666";
-  editorCtx.fillRect(pos.x + 5, pos.y + 5, 25, 25);
+  editorCtx.fillRect(pos.x + 4, pos.y + 4, 14, 14);
 }
 
 function drawBlueAttractor(gridX: number, gridY: number) {
   const pos = gridToPixel(gridX, gridY);
   editorCtx.fillStyle = "#4444c4";
-  editorCtx.fillRect(pos.x, pos.y, 35, 35);
+  editorCtx.fillRect(pos.x, pos.y, 22, 22);
   editorCtx.fillStyle = "#6666ff";
-  editorCtx.fillRect(pos.x + 5, pos.y + 5, 25, 25);
+  editorCtx.fillRect(pos.x + 4, pos.y + 4, 14, 14);
 }
 
 function drawTarget(gridX: number, gridY: number) {
   const pos = gridToPixel(gridX, gridY);
   editorCtx.fillStyle = "#4CAF50";
-  editorCtx.fillRect(pos.x, pos.y, 35, 35);
+  editorCtx.fillRect(pos.x, pos.y, 22, 22);
   editorCtx.fillStyle = "#66ff66";
-  editorCtx.fillRect(pos.x + 5, pos.y + 5, 25, 25);
+  editorCtx.fillRect(pos.x + 4, pos.y + 4, 14, 14);
 }
 
 function drawWall(gridX: number, gridY: number) {
