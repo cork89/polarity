@@ -148,6 +148,7 @@ interface Target {
   x: number;
   y: number;
   collected: boolean;
+  rotationOffset: number;
 }
 
 interface Wall {
@@ -199,7 +200,7 @@ let walls: Wall[] = [];
 // Current level info
 let currentLevelName: string | null = null;
 let currentLevelData: LevelData | null = null;
-let currentStageIndex = 0;
+let currentPlayStageIndex = 0;
 let totalStages = 0;
 
 // Sound effects
@@ -274,7 +275,11 @@ function parseGrid(grid: string[][]) {
           blues.push(gridToPixel(x, y));
           break;
         case "T":
-          targs.push({ ...gridToPixel(x, y), collected: false });
+          targs.push({
+            ...gridToPixel(x, y),
+            collected: false,
+            rotationOffset: Math.random() * Math.PI * 2,
+          });
           break;
         case "W":
           wallList.push({ x: x * PLAY_CELL_SIZE, y: y * PLAY_CELL_SIZE });
@@ -339,7 +344,7 @@ function loadLevel(
 ) {
   // Store level data for stage progression
   currentLevelData = levelData;
-  currentStageIndex = stageIndex;
+  currentPlayStageIndex = stageIndex;
   totalStages = levelData.stages?.length || 1;
 
   // Set game mode from level (default to staged for backward compatibility)
@@ -452,6 +457,7 @@ function spawnRandomTargets() {
           x: targetX,
           y: targetY,
           collected: false,
+          rotationOffset: Math.random() * Math.PI * 2,
         });
       }
     }
@@ -467,6 +473,7 @@ function spawnRandomTargets() {
         x: targetX,
         y: targetY,
         collected: false,
+        rotationOffset: Math.random() * Math.PI * 2,
       });
     }
   }
@@ -820,7 +827,7 @@ function checkCollisions() {
           );
           if (
             allTargetsInCurrentStageCollected &&
-            currentStageIndex >= totalStages - 1
+            currentPlayStageIndex >= totalStages - 1
           ) {
             isGameOver = true;
           }
@@ -853,11 +860,11 @@ function checkCollisions() {
     } else if (
       currentLevelData &&
       currentLevelData.stages &&
-      currentStageIndex < totalStages - 1
+      currentPlayStageIndex < totalStages - 1
     ) {
       // Multi-stage level: advance to next stage (keep player position)
-      currentStageIndex++;
-      loadLevel(currentLevelData, currentStageIndex, false);
+      currentPlayStageIndex++;
+      loadLevel(currentLevelData, currentPlayStageIndex, false);
     }
   }
 }
@@ -902,7 +909,13 @@ function drawAttractors() {
       // Add glow behind the image
       gameCtx.shadowColor = COLOR_RED_ATTRACTOR_OUTER;
       gameCtx.shadowBlur = 12;
-      gameCtx.drawImage(redAttractorImage, a.x, a.y, ATTRACTOR_SIZE, ATTRACTOR_SIZE);
+      gameCtx.drawImage(
+        redAttractorImage,
+        a.x,
+        a.y,
+        ATTRACTOR_SIZE,
+        ATTRACTOR_SIZE,
+      );
       gameCtx.shadowBlur = 0;
     } else {
       // Fallback to rectangle drawing with glow
@@ -928,7 +941,13 @@ function drawAttractors() {
       // Add glow behind the image
       gameCtx.shadowColor = COLOR_BLUE_ATTRACTOR_OUTER;
       gameCtx.shadowBlur = 12;
-      gameCtx.drawImage(blueAttractorImage, a.x, a.y, ATTRACTOR_SIZE, ATTRACTOR_SIZE);
+      gameCtx.drawImage(
+        blueAttractorImage,
+        a.x,
+        a.y,
+        ATTRACTOR_SIZE,
+        ATTRACTOR_SIZE,
+      );
       gameCtx.shadowBlur = 0;
     } else {
       // Fallback to rectangle drawing with glow
@@ -949,26 +968,55 @@ function drawAttractors() {
   });
 }
 
-function drawTargets() {
+function drawTargets(time: number) {
   targets.forEach((t) => {
     if (!t.collected) {
+      // Calculate rotation - gentle wiggle like swimming
+      const swimSpeed = 0.003;
+      const maxRotation = Math.PI / 8; // 22.5 degrees
+      const rotation =
+        Math.sin(time * swimSpeed + t.rotationOffset) * maxRotation;
+
+      // Save context and translate to center of target
+      gameCtx.save();
+      gameCtx.translate(t.x + TARGET_SIZE / 2, t.y + TARGET_SIZE / 2);
+      gameCtx.rotate(rotation);
+
       if (targetImageLoaded) {
         // Add glow behind the image
         gameCtx.shadowColor = COLOR_TARGET_OUTER;
         gameCtx.shadowBlur = 10;
-        gameCtx.drawImage(targetImage, t.x, t.y, TARGET_SIZE, TARGET_SIZE);
+        gameCtx.drawImage(
+          targetImage,
+          -TARGET_SIZE / 2,
+          -TARGET_SIZE / 2,
+          TARGET_SIZE,
+          TARGET_SIZE,
+        );
         gameCtx.shadowBlur = 0;
       } else {
         // Fallback to rectangle drawing with glow
         gameCtx.shadowColor = COLOR_TARGET_OUTER;
         gameCtx.shadowBlur = 10;
         gameCtx.fillStyle = COLOR_TARGET_OUTER;
-        gameCtx.fillRect(t.x, t.y, TARGET_SIZE, TARGET_SIZE);
+        gameCtx.fillRect(
+          -TARGET_SIZE / 2,
+          -TARGET_SIZE / 2,
+          TARGET_SIZE,
+          TARGET_SIZE,
+        );
         // Inner detail
         gameCtx.shadowBlur = 0;
         gameCtx.fillStyle = COLOR_TARGET_INNER;
-        gameCtx.fillRect(t.x + 5, t.y + 5, TARGET_SIZE - 10, TARGET_SIZE - 10);
+        gameCtx.fillRect(
+          -TARGET_SIZE / 2 + 5,
+          -TARGET_SIZE / 2 + 5,
+          TARGET_SIZE - 10,
+          TARGET_SIZE - 10,
+        );
       }
+
+      gameCtx.restore();
     }
   });
 }
@@ -1188,8 +1236,12 @@ function gameLoop() {
 
   // Add underwater depth gradient overlay
   const gradient = gameCtx.createRadialGradient(
-    gameCanvas.width / 2, gameCanvas.height / 2, 0,
-    gameCanvas.width / 2, gameCanvas.height / 2, gameCanvas.width * 0.8
+    gameCanvas.width / 2,
+    gameCanvas.height / 2,
+    0,
+    gameCanvas.width / 2,
+    gameCanvas.height / 2,
+    gameCanvas.width * 0.8,
   );
   gradient.addColorStop(0, "rgba(5, 30, 60, 0)");
   gradient.addColorStop(1, "rgba(0, 10, 25, 0.4)");
@@ -1204,7 +1256,7 @@ function gameLoop() {
     drawWalls();
     drawAttractionLines();
     drawAttractors();
-    drawTargets();
+    drawTargets(Date.now());
     drawParticles();
     drawPlayer();
     // Show game over overlay
@@ -1225,7 +1277,7 @@ function gameLoop() {
     drawWalls();
     drawAttractionLines();
     drawAttractors();
-    drawTargets();
+    drawTargets(Date.now());
     drawParticles();
     drawPlayer();
   }
