@@ -59,6 +59,12 @@ const gameOverTitle = getRequiredElement<HTMLDivElement>("gameOverTitle");
 const gameOverScore = getRequiredElement<HTMLDivElement>("gameOverScore");
 const gameOverButton = getRequiredElement<HTMLButtonElement>("gameOverButton");
 
+// Mute button
+const muteButton = document.getElementById("muteButton");
+const audioPlayingIcon = document.getElementById("audioPlayingIcon");
+const audioMutedIcon = document.getElementById("audioMutedIcon");
+let isMuted = false;
+
 // Game settings
 const PLAY_GRID_SIZE = 6;
 const PLAY_CELL_SIZE = gameCanvas.width / PLAY_GRID_SIZE;
@@ -320,6 +326,35 @@ bgSynth1.volume = 0.2;
 bgSynth2.volume = 0.2;
 let currentBgTrack: 1 | 2 = 1;
 let bgMusicStarted = false;
+
+// Mute toggle functionality
+const allSounds = [blueSound, redSound, collectSound, bgSynth1, bgSynth2];
+
+function toggleMute(): void {
+  isMuted = !isMuted;
+
+  // Update all sound volumes
+  for (const sound of allSounds) {
+    sound.muted = isMuted;
+  }
+
+  // Update button appearance
+  if (muteButton) {
+    if (isMuted) {
+      muteButton.classList.add("muted");
+      if (audioPlayingIcon) audioPlayingIcon.style.display = "none";
+      if (audioMutedIcon) audioMutedIcon.style.display = "block";
+    } else {
+      muteButton.classList.remove("muted");
+      if (audioPlayingIcon) audioPlayingIcon.style.display = "block";
+      if (audioMutedIcon) audioMutedIcon.style.display = "none";
+    }
+  }
+}
+
+if (muteButton) {
+  muteButton.addEventListener("click", toggleMute);
+}
 
 function playNextBgTrack(): void {
   if (currentBgTrack === 1) {
@@ -835,31 +870,70 @@ gameOverButton.addEventListener("click", () => {
 });
 
 // Physics
-function applyAttraction() {
-  let attractors: Attractor[] = [];
+function getClosestAttractor(attractors: Attractor[]): Attractor | null {
+  if (attractors.length === 0) return null;
 
-  if (keys.x) {
-    attractors = attractors.concat(redAttractors);
-  }
-  if (keys.z) {
-    attractors = attractors.concat(blueAttractors);
-  }
+  const playerCenterX = player.x + player.size / 2;
+  const playerCenterY = player.y + player.size / 2;
 
-  attractors.forEach((attractor) => {
-    const dx = attractor.x + ATTRACTOR_SIZE / 2 - (player.x + player.size / 2);
-    const dy = attractor.y + ATTRACTOR_SIZE / 2 - (player.y + player.size / 2);
+  let closest: Attractor | null = null;
+  let closestDist = Infinity;
+
+  for (const attractor of attractors) {
+    const dx = attractor.x + ATTRACTOR_SIZE / 2 - playerCenterX;
+    const dy = attractor.y + ATTRACTOR_SIZE / 2 - playerCenterY;
     const dist = Math.sqrt(dx * dx + dy * dy);
 
-    if (dist > MIN_ATTRACTION_DISTANCE) {
-      const force =
-        (ATTRACTION_FORCE_NUMERATOR /
-          (dist * dist + ATTRACTION_FORCE_DAMPENING)) *
-        PHYSICS_SPEED;
-      // Accumulate velocity towards magnets without any damping
-      player.vx += (dx / dist) * force;
-      player.vy += (dy / dist) * force;
+    if (dist < closestDist) {
+      closestDist = dist;
+      closest = attractor;
     }
-  });
+  }
+
+  return closest;
+}
+
+function applyAttraction() {
+  const playerCenterX = player.x + player.size / 2;
+  const playerCenterY = player.y + player.size / 2;
+
+  // Only attract to closest red attractor
+  if (keys.x) {
+    const closestRed = getClosestAttractor(redAttractors);
+    if (closestRed) {
+      const dx = closestRed.x + ATTRACTOR_SIZE / 2 - playerCenterX;
+      const dy = closestRed.y + ATTRACTOR_SIZE / 2 - playerCenterY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist > MIN_ATTRACTION_DISTANCE) {
+        const force =
+          (ATTRACTION_FORCE_NUMERATOR /
+            (dist * dist + ATTRACTION_FORCE_DAMPENING)) *
+          PHYSICS_SPEED;
+        player.vx += (dx / dist) * force;
+        player.vy += (dy / dist) * force;
+      }
+    }
+  }
+
+  // Only attract to closest blue attractor
+  if (keys.z) {
+    const closestBlue = getClosestAttractor(blueAttractors);
+    if (closestBlue) {
+      const dx = closestBlue.x + ATTRACTOR_SIZE / 2 - playerCenterX;
+      const dy = closestBlue.y + ATTRACTOR_SIZE / 2 - playerCenterY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist > MIN_ATTRACTION_DISTANCE) {
+        const force =
+          (ATTRACTION_FORCE_NUMERATOR /
+            (dist * dist + ATTRACTION_FORCE_DAMPENING)) *
+          PHYSICS_SPEED;
+        player.vx += (dx / dist) * force;
+        player.vy += (dy / dist) * force;
+      }
+    }
+  }
 }
 
 function updatePlayer() {
@@ -1015,6 +1089,9 @@ function checkCollisions() {
       // Multi-stage level: advance to next stage (keep player position)
       currentPlayStageIndex++;
       loadLevel(currentLevelData, currentPlayStageIndex, false);
+    } else if (currentGameMode === "staged") {
+      // Staged mode: all targets collected in final stage (or single-stage level)
+      isGameOver = true;
     }
   }
 }
@@ -1246,24 +1323,26 @@ function drawParticles() {
 
 function drawAttractionLines() {
   if (keys.x) {
-    redAttractors.forEach((a) => {
+    const closestRed = getClosestAttractor(redAttractors);
+    if (closestRed) {
       gameCtx.strokeStyle = COLOR_ATTRACTION_LINE_RED;
       gameCtx.lineWidth = 2;
       gameCtx.beginPath();
       gameCtx.moveTo(player.x + player.size / 2, player.y + player.size / 2);
-      gameCtx.lineTo(a.x + ATTRACTOR_SIZE / 2, a.y + ATTRACTOR_SIZE / 2);
+      gameCtx.lineTo(closestRed.x + ATTRACTOR_SIZE / 2, closestRed.y + ATTRACTOR_SIZE / 2);
       gameCtx.stroke();
-    });
+    }
   }
   if (keys.z) {
-    blueAttractors.forEach((a) => {
+    const closestBlue = getClosestAttractor(blueAttractors);
+    if (closestBlue) {
       gameCtx.strokeStyle = COLOR_ATTRACTION_LINE_BLUE;
       gameCtx.lineWidth = 2;
       gameCtx.beginPath();
       gameCtx.moveTo(player.x + player.size / 2, player.y + player.size / 2);
-      gameCtx.lineTo(a.x + ATTRACTOR_SIZE / 2, a.y + ATTRACTOR_SIZE / 2);
+      gameCtx.lineTo(closestBlue.x + ATTRACTOR_SIZE / 2, closestBlue.y + ATTRACTOR_SIZE / 2);
       gameCtx.stroke();
-    });
+    }
   }
 }
 

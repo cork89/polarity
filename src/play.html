@@ -52,8 +52,6 @@
         margin: 0;
         padding: 0;
         background: var(--bg-color);
-        background-image: linear-gradient(var(--grid-line) 1px, transparent 1px),
-          linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
         background-size: 40px 40px;
         display: flex;
         flex-direction: column;
@@ -154,6 +152,43 @@
         background: rgba(0, 212, 255, 0.2);
         color: var(--neon-cyan);
         box-shadow: 0 0 20px var(--neon-cyan-glow);
+      }
+
+      /* Mute button */
+      .mute-button {
+        padding: 8px 12px;
+        background: var(--key-bg);
+        color: var(--neon-cyan);
+        border: 2px solid var(--neon-cyan);
+        border-radius: 4px;
+        cursor: pointer;
+        box-shadow: 0 0 10px var(--neon-cyan-glow);
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 44px;
+      }
+
+      .mute-button:hover {
+        background: var(--key-bg-hover);
+        box-shadow: 0 0 15px var(--neon-cyan-glow);
+      }
+
+      .mute-button.muted {
+        color: var(--neon-orange);
+        border-color: var(--neon-orange);
+        box-shadow: 0 0 10px var(--neon-orange-glow);
+      }
+
+      .mute-button.muted:hover {
+        box-shadow: 0 0 15px var(--neon-orange-glow);
+      }
+
+      .mute-button svg {
+        width: 20px;
+        height: 20px;
+        display: block;
       }
 
       /* Game container with positioned buttons */
@@ -312,9 +347,34 @@
       <select class="level-select" id="levelSelect">
         <option value="">-- Random Level --</option>
       </select>
+      <button class="mute-button" id="muteButton" aria-label="Toggle sound">
+        <svg
+          id="audioPlayingIcon"
+          xmlns="http://www.w3.org/2000/svg"
+          fill="currentColor"
+          viewBox="0 0 20 20"
+        >
+          <path
+            d="M9.891 19.854c-.25 0-.494-.087-.687-.247l-5.389-4.662H2.108A1.125 1.125 0 0 1 1 13.807V6.193a1.125 1.125 0 0 1 1.108-1.138h1.707L9.19.405a1.09 1.09 0 0 1 1.168-.153A1.13 1.13 0 0 1 11 1.285v17.43a1.13 1.13 0 0 1-.643 1.033c-.145.07-.305.106-.466.106M2.251 13.7h2.03l5.47 4.727V1.572L4.28 6.305H2.25zM16.124 10A3.13 3.13 0 0 0 13 6.875v1.25a1.875 1.875 0 1 1 0 3.75v1.25A3.13 3.13 0 0 0 16.125 10ZM20 10a7.01 7.01 0 0 0-7-7v1.25a5.75 5.75 0 1 1 0 11.5V17a7.01 7.01 0 0 0 7-7"
+          ></path>
+        </svg>
+        <svg
+          id="audioMutedIcon"
+          xmlns="http://www.w3.org/2000/svg"
+          fill="currentColor"
+          viewBox="0 0 20 20"
+          style="display: none"
+        >
+          <path
+            d="m16.784 9.5 2.558 2.558-.884.884-2.558-2.558-2.558 2.558-.884-.884L15.016 9.5l-2.558-2.558.884-.884L15.9 8.616l2.558-2.558.884.884zm-6.427 10.248A1.13 1.13 0 0 0 11 18.715V1.286a1.13 1.13 0 0 0-.643-1.034A1.09 1.09 0 0 0 9.19.405L3.815 5.056H2.108A1.124 1.124 0 0 0 1 6.194v7.613a1.124 1.124 0 0 0 1.108 1.138h1.707L9.2 19.608a1.08 1.08 0 0 0 1.157.14M2.25 6.306h2.031l5.47-4.733v16.855L4.28 13.7H2.25z"
+          ></path>
+        </svg>
+      </button>
       <a href="editor.html" class="editor-link">Open Level Editor</a>
     </div>
-    <div style="display: flex; gap: 15px; margin-bottom: 10px">
+    <div
+      style="display: flex; gap: 15px; margin-bottom: 10px; align-items: center"
+    >
       <div class="timer-display">
         <span class="timer-label">TIME</span>
         <span id="timerFont" class="font-seven-segment"> 30</span>
