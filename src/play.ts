@@ -286,7 +286,7 @@ const player: Player = {
 let redAttractors: Attractor[] = [];
 let blueAttractors: Attractor[] = [];
 
-// Targets (green squares)
+// Targets (fish)
 let targets: Target[] = [];
 
 // Walls (impassable barriers)
@@ -299,14 +299,58 @@ let currentPlayStageIndex = 0;
 let totalStages = 0;
 
 // Sound effects
-const blueSound = new Audio("synth1.ogg");
-const redSound = new Audio("synth2.ogg");
+const blueSound = new Audio("electric1.ogg");
+const redSound = new Audio("electric2.ogg");
 const collectSound = new Audio("eat.ogg");
 blueSound.loop = true;
 redSound.loop = true;
-blueSound.volume = 0.2;
-redSound.volume = 0.2;
+blueSound.volume = 0.3;
+redSound.volume = 0.3;
 collectSound.volume = 0.3;
+
+// Preload audio files to ensure they're ready
+blueSound.preload = "auto";
+redSound.preload = "auto";
+collectSound.preload = "auto";
+
+// Background ambiance - plays synth1.ogg and synth2.ogg serially
+const bgSynth1 = new Audio("synth1.ogg");
+const bgSynth2 = new Audio("synth2.ogg");
+bgSynth1.volume = 0.2;
+bgSynth2.volume = 0.2;
+let currentBgTrack: 1 | 2 = 1;
+let bgMusicStarted = false;
+
+function playNextBgTrack(): void {
+  if (currentBgTrack === 1) {
+    bgSynth1.currentTime = 0;
+    bgSynth1.play().catch((err) => {
+      console.log("BG music autoplay blocked, will try on user interaction");
+    });
+  } else {
+    bgSynth2.currentTime = 0;
+    bgSynth2.play().catch((err) => {
+      console.log("BG music autoplay blocked, will try on user interaction");
+    });
+  }
+}
+
+function startBackgroundMusic(): void {
+  if (!bgMusicStarted) {
+    bgMusicStarted = true;
+    playNextBgTrack();
+  }
+}
+
+bgSynth1.addEventListener("ended", () => {
+  currentBgTrack = 2;
+  playNextBgTrack();
+});
+
+bgSynth2.addEventListener("ended", () => {
+  currentBgTrack = 1;
+  playNextBgTrack();
+});
 
 // Sound fade out tracking
 const FADE_DURATION = 150; // milliseconds to fade out
@@ -704,6 +748,7 @@ function checkForEditorLevel() {
 const keys = { x: false, z: false };
 
 document.addEventListener("keydown", (e) => {
+  startBackgroundMusic();
   if (e.key.toLowerCase() === "x") {
     keys.x = true;
     btnX?.classList.add("active");
@@ -734,6 +779,7 @@ function setupArcadeButton(button: HTMLElement | null, key: "z" | "x") {
 
   const startHandler = (e: Event) => {
     e.preventDefault();
+    startBackgroundMusic();
     keys[key] = true;
   };
 
@@ -1406,6 +1452,9 @@ async function initializeGame(): Promise<void> {
 
   // Populate level selector
   populateLevelSelector();
+
+  // Start background ambiance
+  playNextBgTrack();
 
   // Start the game loop
   gameLoop();
