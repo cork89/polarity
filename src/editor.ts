@@ -196,6 +196,24 @@ function validateLevel(): { valid: boolean; error: string | null } {
     return { valid: false, error: "No player placed" };
   }
 
+  // Check for at least one red and one blue magnet
+  let hasRed = false;
+  let hasBlue = false;
+  for (let y = 0; y < GRID_SIZE; y++) {
+    const row = currentLevel.baseGrid[y];
+    if (!row) continue;
+    for (let x = 0; x < GRID_SIZE; x++) {
+      if (row[x] === "R") hasRed = true;
+      if (row[x] === "B") hasBlue = true;
+    }
+  }
+  if (!hasRed) {
+    return { valid: false, error: "At least one red magnet required" };
+  }
+  if (!hasBlue) {
+    return { valid: false, error: "At least one blue magnet required" };
+  }
+
   // Time Attack and Sprint only need a player
   if (
     currentLevel.gameMode === "timeAttack" ||
@@ -368,6 +386,20 @@ function placeObject(gridX: number, gridY: number) {
     }
   } else {
     // Player, magnets, walls go into base grid
+
+    // If placing a player, remove any existing player first
+    if (letter === "P") {
+      for (let y = 0; y < GRID_SIZE; y++) {
+        const row = currentLevel.baseGrid[y];
+        if (!row) continue;
+        for (let x = 0; x < GRID_SIZE; x++) {
+          if (row[x] === "P") {
+            row[x] = " ";
+          }
+        }
+      }
+    }
+
     const baseRow = currentLevel.baseGrid[gridY];
     if (baseRow) {
       baseRow[gridX] = letter;
