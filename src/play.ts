@@ -73,23 +73,23 @@ type GameMode = "timeAttack" | "sprint" | "staged";
 const SPRINT_TARGET_SCORE = 250;
 const TIME_ATTACK_DURATION = 30;
 
-// Colors
-const COLOR_BACKGROUND = "#5a4a3a";
-const COLOR_GRID = "#6a5a4a";
+// Colors - Underwater Tron Theme
+const COLOR_BACKGROUND = "#0a1628";
+const COLOR_GRID = "#00d4ff";
 const COLOR_PLAYER_OUTER = "#666";
 const COLOR_PLAYER_INNER = "#7d7d7dff";
 const COLOR_PLAYER_TRAIL = "rgba(150, 150, 150, 0.3)";
-const COLOR_RED_ATTRACTOR_OUTER = "#c44444";
-const COLOR_RED_ATTRACTOR_INNER = "#ff6666";
-const COLOR_BLUE_ATTRACTOR_OUTER = "#4444c4";
-const COLOR_BLUE_ATTRACTOR_INNER = "#6666ff";
-const COLOR_TARGET_OUTER = "#4CAF50";
-const COLOR_TARGET_INNER = "#66ff66";
-const COLOR_TARGET_PARTICLE = "#4CAF50";
-const COLOR_WALL_OUTER = "#aaaaaa";
-const COLOR_WALL_INNER = "#cccccc";
-const COLOR_ATTRACTION_LINE_RED = "rgba(255, 100, 100, 0.3)";
-const COLOR_ATTRACTION_LINE_BLUE = "rgba(100, 100, 255, 0.3)";
+const COLOR_RED_ATTRACTOR_OUTER = "#ff2a6d";
+const COLOR_RED_ATTRACTOR_INNER = "#ff5c8d";
+const COLOR_BLUE_ATTRACTOR_OUTER = "#05d9e8";
+const COLOR_BLUE_ATTRACTOR_INNER = "#39eaff";
+const COLOR_TARGET_OUTER = "#ffd700";
+const COLOR_TARGET_INNER = "#ffec8b";
+const COLOR_TARGET_PARTICLE = "#ffd700";
+const COLOR_WALL_OUTER = "#2d4a5c";
+const COLOR_WALL_INNER = "#3d6a7c";
+const COLOR_ATTRACTION_LINE_RED = "rgba(255, 42, 109, 0.5)";
+const COLOR_ATTRACTION_LINE_BLUE = "rgba(5, 217, 232, 0.5)";
 
 // Update font-based displays
 function updateFontDisplay(
@@ -873,8 +873,11 @@ function updateParticles() {
 
 // Drawing functions
 function drawGrid() {
+  // Add glow effect for tron aesthetic
+  gameCtx.shadowColor = COLOR_GRID;
+  gameCtx.shadowBlur = 8;
   gameCtx.strokeStyle = COLOR_GRID;
-  gameCtx.lineWidth = 2;
+  gameCtx.lineWidth = 1.5;
 
   for (let i = 0; i <= PLAY_GRID_SIZE; i++) {
     gameCtx.beginPath();
@@ -887,18 +890,28 @@ function drawGrid() {
     gameCtx.lineTo(gameCanvas.width, i * PLAY_CELL_SIZE);
     gameCtx.stroke();
   }
+
+  // Reset shadow for other elements
+  gameCtx.shadowBlur = 0;
 }
 
 function drawAttractors() {
   // Red attractors
   redAttractors.forEach((a) => {
     if (redAttractorImageLoaded) {
+      // Add glow behind the image
+      gameCtx.shadowColor = COLOR_RED_ATTRACTOR_OUTER;
+      gameCtx.shadowBlur = 12;
       gameCtx.drawImage(redAttractorImage, a.x, a.y, ATTRACTOR_SIZE, ATTRACTOR_SIZE);
+      gameCtx.shadowBlur = 0;
     } else {
-      // Fallback to rectangle drawing
+      // Fallback to rectangle drawing with glow
+      gameCtx.shadowColor = COLOR_RED_ATTRACTOR_OUTER;
+      gameCtx.shadowBlur = 12;
       gameCtx.fillStyle = COLOR_RED_ATTRACTOR_OUTER;
       gameCtx.fillRect(a.x, a.y, ATTRACTOR_SIZE, ATTRACTOR_SIZE);
       // Inner detail
+      gameCtx.shadowBlur = 0;
       gameCtx.fillStyle = COLOR_RED_ATTRACTOR_INNER;
       gameCtx.fillRect(
         a.x + 5,
@@ -906,19 +919,25 @@ function drawAttractors() {
         ATTRACTOR_SIZE - 10,
         ATTRACTOR_SIZE - 10,
       );
-      gameCtx.fillStyle = COLOR_RED_ATTRACTOR_OUTER;
     }
   });
 
   // Blue attractors
   blueAttractors.forEach((a) => {
     if (blueAttractorImageLoaded) {
+      // Add glow behind the image
+      gameCtx.shadowColor = COLOR_BLUE_ATTRACTOR_OUTER;
+      gameCtx.shadowBlur = 12;
       gameCtx.drawImage(blueAttractorImage, a.x, a.y, ATTRACTOR_SIZE, ATTRACTOR_SIZE);
+      gameCtx.shadowBlur = 0;
     } else {
-      // Fallback to rectangle drawing
+      // Fallback to rectangle drawing with glow
+      gameCtx.shadowColor = COLOR_BLUE_ATTRACTOR_OUTER;
+      gameCtx.shadowBlur = 12;
       gameCtx.fillStyle = COLOR_BLUE_ATTRACTOR_OUTER;
       gameCtx.fillRect(a.x, a.y, ATTRACTOR_SIZE, ATTRACTOR_SIZE);
       // Inner detail
+      gameCtx.shadowBlur = 0;
       gameCtx.fillStyle = COLOR_BLUE_ATTRACTOR_INNER;
       gameCtx.fillRect(
         a.x + 5,
@@ -926,7 +945,6 @@ function drawAttractors() {
         ATTRACTOR_SIZE - 10,
         ATTRACTOR_SIZE - 10,
       );
-      gameCtx.fillStyle = COLOR_BLUE_ATTRACTOR_OUTER;
     }
   });
 }
@@ -935,12 +953,19 @@ function drawTargets() {
   targets.forEach((t) => {
     if (!t.collected) {
       if (targetImageLoaded) {
+        // Add glow behind the image
+        gameCtx.shadowColor = COLOR_TARGET_OUTER;
+        gameCtx.shadowBlur = 10;
         gameCtx.drawImage(targetImage, t.x, t.y, TARGET_SIZE, TARGET_SIZE);
+        gameCtx.shadowBlur = 0;
       } else {
-        // Fallback to rectangle drawing
+        // Fallback to rectangle drawing with glow
+        gameCtx.shadowColor = COLOR_TARGET_OUTER;
+        gameCtx.shadowBlur = 10;
         gameCtx.fillStyle = COLOR_TARGET_OUTER;
         gameCtx.fillRect(t.x, t.y, TARGET_SIZE, TARGET_SIZE);
         // Inner detail
+        gameCtx.shadowBlur = 0;
         gameCtx.fillStyle = COLOR_TARGET_INNER;
         gameCtx.fillRect(t.x + 5, t.y + 5, TARGET_SIZE - 10, TARGET_SIZE - 10);
       }
@@ -1157,8 +1182,18 @@ function gameLoop() {
   blueFadeStartTime = fadeAudio(blueSound, blueFadeStartTime, now);
   redFadeStartTime = fadeAudio(redSound, redFadeStartTime, now);
 
-  // Clear canvas
+  // Clear canvas with underwater background
   gameCtx.fillStyle = COLOR_BACKGROUND;
+  gameCtx.fillRect(0, 0, gameCanvas.width, gameCanvas.height);
+
+  // Add underwater depth gradient overlay
+  const gradient = gameCtx.createRadialGradient(
+    gameCanvas.width / 2, gameCanvas.height / 2, 0,
+    gameCanvas.width / 2, gameCanvas.height / 2, gameCanvas.width * 0.8
+  );
+  gradient.addColorStop(0, "rgba(5, 30, 60, 0)");
+  gradient.addColorStop(1, "rgba(0, 10, 25, 0.4)");
+  gameCtx.fillStyle = gradient;
   gameCtx.fillRect(0, 0, gameCanvas.width, gameCanvas.height);
 
   // Draw grid
