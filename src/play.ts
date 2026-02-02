@@ -1,8 +1,17 @@
-const gameCanvas = document.getElementById("gameCanvas") as HTMLCanvasElement;
-if (!gameCanvas) {
-  throw new Error("failed");
+// Helper to get required DOM elements - fails fast if element is missing
+function getRequiredElement<T extends HTMLElement>(id: string): T {
+  const el = document.getElementById(id) as T | null;
+  if (!el) throw new Error(`Required element #${id} not found`);
+  return el;
 }
-const gameCtx = gameCanvas.getContext("2d")!;
+
+// Get critical DOM elements
+const gameCanvas = getRequiredElement<HTMLCanvasElement>("gameCanvas");
+const gameCtxRaw = gameCanvas.getContext("2d");
+if (!gameCtxRaw) {
+  throw new Error("Failed to get 2D canvas context");
+}
+const gameCtx = gameCtxRaw;
 
 // Load player image
 const playerImage = new Image();
@@ -43,18 +52,12 @@ const timerFont = document.getElementById(
 const levelSelect = document.getElementById(
   "levelSelect",
 ) as HTMLSelectElement | null;
-const gameOverOverlay = document.getElementById(
-  "gameOverOverlay",
-) as HTMLDivElement | null;
-const gameOverTitle = document.getElementById(
-  "gameOverTitle",
-) as HTMLDivElement | null;
-const gameOverScore = document.getElementById(
-  "gameOverScore",
-) as HTMLDivElement | null;
-const gameOverButton = document.getElementById(
-  "gameOverButton",
-) as HTMLButtonElement | null;
+
+// Critical game over UI elements - fail fast if missing
+const gameOverOverlay = getRequiredElement<HTMLDivElement>("gameOverOverlay");
+const gameOverTitle = getRequiredElement<HTMLDivElement>("gameOverTitle");
+const gameOverScore = getRequiredElement<HTMLDivElement>("gameOverScore");
+const gameOverButton = getRequiredElement<HTMLButtonElement>("gameOverButton");
 
 // Game settings
 const PLAY_GRID_SIZE = 6;
@@ -90,6 +93,22 @@ const COLOR_WALL_OUTER = "#2d4a5c";
 const COLOR_WALL_INNER = "#3d6a7c";
 const COLOR_ATTRACTION_LINE_RED = "rgba(255, 42, 109, 0.5)";
 const COLOR_ATTRACTION_LINE_BLUE = "rgba(5, 217, 232, 0.5)";
+
+// Gameplay constants
+const TRAIL_FADE_RATE = 0.95;
+const TRAIL_MAX_LENGTH = 20;
+const TRAIL_WIDTH_RATIO = 0.6;
+const MIN_ATTRACTION_DISTANCE = 10;
+const ATTRACTION_FORCE_NUMERATOR = 400;
+const ATTRACTION_FORCE_DAMPENING = 200;
+const PARTICLE_LIFE_DECAY = 0.02;
+const PARTICLE_COUNT_ON_COLLECT = 10;
+const WALL_DETAIL_INSET = 5;
+const ATTRACTOR_DETAIL_INSET = 5;
+const TARGET_SWIM_SPEED = 0.003;
+const MAX_TARGET_ROTATION = Math.PI / 8;
+const PLAYER_TILT_FACTOR = 0.05;
+const MAX_PLAYER_TILT = Math.PI / 6;
 
 // Update font-based displays
 function updateFontDisplay(
@@ -166,12 +185,88 @@ interface Player {
   hasAttracted: boolean;
 }
 
+class TrailPointPool {
+  private pool: TrailPoint[] = [];
+  private index = 0;
+
+  acquire(x: number, y: number, alpha: number): TrailPoint {
+    if (this.index < this.pool.length) {
+      const point = this.pool[this.index]!;
+      point.x = x;
+      point.y = y;
+      point.alpha = alpha;
+      this.index++;
+      return point;
+    }
+    const newPoint: TrailPoint = { x, y, alpha };
+    this.pool.push(newPoint);
+    this.index++;
+    return newPoint;
+  }
+
+  reset(): void {
+    this.index = 0;
+  }
+
+  getActiveCount(): number {
+    return this.index;
+  }
+
+  getAll(): TrailPoint[] {
+    return this.pool;
+  }
+}
+
+class ParticlePool {
+  private pool: Particle[] = [];
+  private index = 0;
+
+  acquire(
+    x: number,
+    y: number,
+    vx: number,
+    vy: number,
+    life: number,
+    color: string,
+  ): Particle {
+    if (this.index < this.pool.length) {
+      const p = this.pool[this.index]!;
+      p.x = x;
+      p.y = y;
+      p.vx = vx;
+      p.vy = vy;
+      p.life = life;
+      p.color = color;
+      this.index++;
+      return p;
+    }
+    const newParticle: Particle = { x, y, vx, vy, life, color };
+    this.pool.push(newParticle);
+    this.index++;
+    return newParticle;
+  }
+
+  reset(): void {
+    this.index = 0;
+  }
+
+  getActiveCount(): number {
+    return this.index;
+  }
+
+  getAll(): Particle[] {
+    return this.pool;
+  }
+}
+
+const trailPool = new TrailPointPool();
+const particlePool = new ParticlePool();
+
 // Game state
 let score = 0;
 let particles: Particle[] = [];
 let timeRemaining = 30;
 let isGameOver = false;
-let gameStartTime = Date.now();
 let lastTimerUpdate = Date.now();
 let currentGameMode: GameMode = "timeAttack";
 let sprintTimeElapsed = 0;
@@ -206,7 +301,7 @@ let totalStages = 0;
 // Sound effects
 const blueSound = new Audio("synth1.ogg");
 const redSound = new Audio("synth2.ogg");
-const collectSound = new Audio("coingather.ogg");
+const collectSound = new Audio("eat.ogg");
 blueSound.loop = true;
 redSound.loop = true;
 blueSound.volume = 0.2;
@@ -687,13 +782,11 @@ document.addEventListener("keydown", (e) => {
 });
 
 // Restart game on button click when game over
-if (gameOverButton) {
-  gameOverButton.addEventListener("click", () => {
-    if (isGameOver) {
-      restartGame();
-    }
-  });
-}
+gameOverButton.addEventListener("click", () => {
+  if (isGameOver) {
+    restartGame();
+  }
+});
 
 // Physics
 function applyAttraction() {
@@ -711,8 +804,11 @@ function applyAttraction() {
     const dy = attractor.y + ATTRACTOR_SIZE / 2 - (player.y + player.size / 2);
     const dist = Math.sqrt(dx * dx + dy * dy);
 
-    if (dist > 10) {
-      const force = (400 / (dist * dist + 200)) * PHYSICS_SPEED;
+    if (dist > MIN_ATTRACTION_DISTANCE) {
+      const force =
+        (ATTRACTION_FORCE_NUMERATOR /
+          (dist * dist + ATTRACTION_FORCE_DAMPENING)) *
+        PHYSICS_SPEED;
       // Accumulate velocity towards magnets without any damping
       player.vx += (dx / dist) * force;
       player.vy += (dy / dist) * force;
@@ -754,18 +850,22 @@ function updatePlayer() {
 
   // Wall collision - stop player from passing through walls
   walls.forEach((wall) => {
+    // Cache wall properties to avoid repeated property access
+    const wallX = wall.x;
+    const wallY = wall.y;
+
     // Check if player intersects with wall
     if (
-      player.x < wall.x + PLAY_CELL_SIZE &&
-      player.x + player.size > wall.x &&
-      player.y < wall.y + PLAY_CELL_SIZE &&
-      player.y + player.size > wall.y
+      player.x < wallX + PLAY_CELL_SIZE &&
+      player.x + player.size > wallX &&
+      player.y < wallY + PLAY_CELL_SIZE &&
+      player.y + player.size > wallY
     ) {
       // Determine which side of the wall the player hit
-      const overlapLeft = player.x + player.size - wall.x;
-      const overlapRight = wall.x + PLAY_CELL_SIZE - player.x;
-      const overlapTop = player.y + player.size - wall.y;
-      const overlapBottom = wall.y + PLAY_CELL_SIZE - player.y;
+      const overlapLeft = player.x + player.size - wallX;
+      const overlapRight = wallX + PLAY_CELL_SIZE - player.x;
+      const overlapTop = player.y + player.size - wallY;
+      const overlapBottom = wallY + PLAY_CELL_SIZE - player.y;
 
       // Find the smallest overlap
       const minOverlap = Math.min(
@@ -777,25 +877,25 @@ function updatePlayer() {
 
       // Push player out based on smallest overlap
       if (minOverlap === overlapLeft) {
-        player.x = wall.x - player.size;
+        player.x = wallX - player.size;
         player.vx = 0;
       } else if (minOverlap === overlapRight) {
-        player.x = wall.x + PLAY_CELL_SIZE;
+        player.x = wallX + PLAY_CELL_SIZE;
         player.vx = 0;
       } else if (minOverlap === overlapTop) {
-        player.y = wall.y - player.size;
+        player.y = wallY - player.size;
         player.vy = 0;
       } else if (minOverlap === overlapBottom) {
-        player.y = wall.y + PLAY_CELL_SIZE;
+        player.y = wallY + PLAY_CELL_SIZE;
         player.vy = 0;
       }
     }
   });
 
-  // Trail effect
-  player.trail.push({ x: player.x, y: player.y, alpha: 1 });
-  if (player.trail.length > 20) player.trail.shift();
-  player.trail.forEach((t) => (t.alpha *= 0.95));
+  // Trail effect using pool
+  player.trail.push(trailPool.acquire(player.x, player.y, 1));
+  if (player.trail.length > TRAIL_MAX_LENGTH) player.trail.shift();
+  player.trail.forEach((t) => (t.alpha *= TRAIL_FADE_RATE));
 }
 
 function checkCollisions() {
@@ -813,7 +913,9 @@ function checkCollisions() {
 
         // Play collection sound
         collectSound.currentTime = 0;
-        collectSound.play().catch(() => {});
+        collectSound
+          .play()
+          .catch((err) => console.error("Failed to play collect sound:", err));
 
         // Check for Sprint mode win condition
         if (currentGameMode === "sprint" && score >= SPRINT_TARGET_SCORE) {
@@ -833,16 +935,18 @@ function checkCollisions() {
           }
         }
 
-        // Create particles
-        for (let i = 0; i < 10; i++) {
-          particles.push({
-            x: target.x + TARGET_SIZE / 2,
-            y: target.y + TARGET_SIZE / 2,
-            vx: (Math.random() - 0.5) * 5,
-            vy: (Math.random() - 0.5) * 5,
-            life: 1,
-            color: COLOR_TARGET_PARTICLE,
-          });
+        // Create particles using pool
+        for (let i = 0; i < PARTICLE_COUNT_ON_COLLECT; i++) {
+          particles.push(
+            particlePool.acquire(
+              target.x + TARGET_SIZE / 2,
+              target.y + TARGET_SIZE / 2,
+              (Math.random() - 0.5) * 5,
+              (Math.random() - 0.5) * 5,
+              1,
+              COLOR_TARGET_PARTICLE,
+            ),
+          );
         }
       }
     }
@@ -869,13 +973,19 @@ function checkCollisions() {
   }
 }
 
-function updateParticles() {
-  particles = particles.filter((p) => {
+function updateParticles(): void {
+  let writeIndex = 0;
+  for (let i = 0; i < particles.length; i++) {
+    const p = particles[i];
+    if (!p) continue;
     p.x += p.vx;
     p.y += p.vy;
-    p.life -= 0.02;
-    return p.life > 0;
-  });
+    p.life -= PARTICLE_LIFE_DECAY;
+    if (p.life > 0) {
+      particles[writeIndex++] = p;
+    }
+  }
+  particles.length = writeIndex;
 }
 
 // Drawing functions
@@ -927,10 +1037,10 @@ function drawAttractors() {
       gameCtx.shadowBlur = 0;
       gameCtx.fillStyle = COLOR_RED_ATTRACTOR_INNER;
       gameCtx.fillRect(
-        a.x + 5,
-        a.y + 5,
-        ATTRACTOR_SIZE - 10,
-        ATTRACTOR_SIZE - 10,
+        a.x + ATTRACTOR_DETAIL_INSET,
+        a.y + ATTRACTOR_DETAIL_INSET,
+        ATTRACTOR_SIZE - ATTRACTOR_DETAIL_INSET * 2,
+        ATTRACTOR_SIZE - ATTRACTOR_DETAIL_INSET * 2,
       );
     }
   });
@@ -959,10 +1069,10 @@ function drawAttractors() {
       gameCtx.shadowBlur = 0;
       gameCtx.fillStyle = COLOR_BLUE_ATTRACTOR_INNER;
       gameCtx.fillRect(
-        a.x + 5,
-        a.y + 5,
-        ATTRACTOR_SIZE - 10,
-        ATTRACTOR_SIZE - 10,
+        a.x + ATTRACTOR_DETAIL_INSET,
+        a.y + ATTRACTOR_DETAIL_INSET,
+        ATTRACTOR_SIZE - ATTRACTOR_DETAIL_INSET * 2,
+        ATTRACTOR_SIZE - ATTRACTOR_DETAIL_INSET * 2,
       );
     }
   });
@@ -972,10 +1082,9 @@ function drawTargets(time: number) {
   targets.forEach((t) => {
     if (!t.collected) {
       // Calculate rotation - gentle wiggle like swimming
-      const swimSpeed = 0.003;
-      const maxRotation = Math.PI / 8; // 22.5 degrees
       const rotation =
-        Math.sin(time * swimSpeed + t.rotationOffset) * maxRotation;
+        Math.sin(time * TARGET_SWIM_SPEED + t.rotationOffset) *
+        MAX_TARGET_ROTATION;
 
       // Save context and translate to center of target
       gameCtx.save();
@@ -1009,10 +1118,10 @@ function drawTargets(time: number) {
         gameCtx.shadowBlur = 0;
         gameCtx.fillStyle = COLOR_TARGET_INNER;
         gameCtx.fillRect(
-          -TARGET_SIZE / 2 + 5,
-          -TARGET_SIZE / 2 + 5,
-          TARGET_SIZE - 10,
-          TARGET_SIZE - 10,
+          -TARGET_SIZE / 2 + WALL_DETAIL_INSET,
+          -TARGET_SIZE / 2 + WALL_DETAIL_INSET,
+          TARGET_SIZE - WALL_DETAIL_INSET * 2,
+          TARGET_SIZE - WALL_DETAIL_INSET * 2,
         );
       }
 
@@ -1027,15 +1136,20 @@ function drawWalls() {
     gameCtx.fillRect(w.x, w.y, PLAY_CELL_SIZE, PLAY_CELL_SIZE);
     // Inner detail
     gameCtx.fillStyle = COLOR_WALL_INNER;
-    gameCtx.fillRect(w.x + 2, w.y + 2, PLAY_CELL_SIZE - 4, PLAY_CELL_SIZE - 4);
+    gameCtx.fillRect(
+      w.x + WALL_DETAIL_INSET,
+      w.y + WALL_DETAIL_INSET,
+      PLAY_CELL_SIZE - WALL_DETAIL_INSET * 2,
+      PLAY_CELL_SIZE - WALL_DETAIL_INSET * 2,
+    );
   });
 }
 
 function drawPlayer() {
   // Draw trail - narrower to avoid showing through transparent sides of penguin image
-  const trailWidth = player.size * 0.6;
+  const trailWidth = player.size * TRAIL_WIDTH_RATIO;
   const trailOffsetX = (player.size - trailWidth) / 2;
-  player.trail.forEach((t, i) => {
+  player.trail.forEach((t) => {
     gameCtx.fillStyle = `rgba(150, 150, 150, ${t.alpha * 0.3})`;
     gameCtx.fillRect(t.x + trailOffsetX, t.y, trailWidth, player.size);
   });
@@ -1043,8 +1157,10 @@ function drawPlayer() {
   // Draw player image (or fallback to rectangle if not loaded)
   if (playerImageLoaded) {
     // Calculate rotation based on horizontal velocity (tilt left/right)
-    const maxTilt = Math.PI / 6; // 30 degrees max rotation
-    const tilt = Math.max(-maxTilt, Math.min(maxTilt, player.vx * 0.05));
+    const tilt = Math.max(
+      -MAX_PLAYER_TILT,
+      Math.min(MAX_PLAYER_TILT, player.vx * PLAYER_TILT_FACTOR),
+    );
 
     // Save context, translate to center, rotate, draw, restore
     // Hitbox remains unchanged - only visual rotation
@@ -1065,10 +1181,10 @@ function drawPlayer() {
     gameCtx.fillRect(player.x, player.y, player.size, player.size);
     gameCtx.fillStyle = COLOR_PLAYER_INNER;
     gameCtx.fillRect(
-      player.x + 5,
-      player.y + 5,
-      player.size - 10,
-      player.size - 10,
+      player.x + ATTRACTOR_DETAIL_INSET,
+      player.y + ATTRACTOR_DETAIL_INSET,
+      player.size - ATTRACTOR_DETAIL_INSET * 2,
+      player.size - ATTRACTOR_DETAIL_INSET * 2,
     );
   }
 }
@@ -1111,7 +1227,7 @@ function updateTimer() {
 
   const now = Date.now();
   if (now - lastTimerUpdate >= 1000) {
-    lastTimerUpdate = now;
+    lastTimerUpdate += 1000;
 
     if (currentGameMode === "timeAttack") {
       timeRemaining--;
@@ -1129,30 +1245,22 @@ function updateTimer() {
 
 // Show/hide game over overlay
 function drawGameOver() {
-  if (gameOverOverlay) {
-    gameOverOverlay.classList.add("visible");
+  gameOverOverlay.classList.add("visible");
+  if (currentGameMode === "sprint" || currentGameMode === "staged") {
+    gameOverTitle.textContent = "COMPLETE!";
+  } else {
+    gameOverTitle.textContent = "GAME OVER";
   }
-  if (gameOverTitle) {
-    if (currentGameMode === "sprint" || currentGameMode === "staged") {
-      gameOverTitle.textContent = "COMPLETE!";
-    } else {
-      gameOverTitle.textContent = "GAME OVER";
-    }
-  }
-  if (gameOverScore) {
-    if (currentGameMode === "sprint" || currentGameMode === "staged") {
-      gameOverScore.textContent = `Time: ${sprintTimeElapsed} seconds`;
-    } else {
-      gameOverScore.textContent = `Points earned: ${score}`;
-    }
+  if (currentGameMode === "sprint" || currentGameMode === "staged") {
+    gameOverScore.textContent = `Time: ${sprintTimeElapsed} seconds`;
+  } else {
+    gameOverScore.textContent = `Points earned: ${score}`;
   }
 }
 
 // Hide game over overlay
 function hideGameOver() {
-  if (gameOverOverlay) {
-    gameOverOverlay.classList.remove("visible");
-  }
+  gameOverOverlay.classList.remove("visible");
 }
 
 // Restart the game
@@ -1196,7 +1304,9 @@ function gameLoop() {
     if (keys.z) {
       if (blueSound.paused) {
         blueSound.volume = MAX_VOLUME;
-        blueSound.play().catch(() => {});
+        blueSound
+          .play()
+          .catch((err) => console.error("Failed to play blue sound:", err));
       }
       blueFadeStartTime = null;
     } else {
@@ -1208,7 +1318,9 @@ function gameLoop() {
     if (keys.x) {
       if (redSound.paused) {
         redSound.volume = MAX_VOLUME;
-        redSound.play().catch(() => {});
+        redSound
+          .play()
+          .catch((err) => console.error("Failed to play red sound:", err));
       }
       redFadeStartTime = null;
     } else {
@@ -1285,13 +1397,19 @@ function gameLoop() {
   requestAnimationFrame(gameLoop);
 }
 
-// Initialize
-// Check for level from editor first
-if (!checkForEditorLevel()) {
-  loadDefaultLevel();
+// Initialize game
+async function initializeGame(): Promise<void> {
+  // Check for level from editor first
+  if (!checkForEditorLevel()) {
+    loadDefaultLevel();
+  }
+
+  // Populate level selector
+  populateLevelSelector();
+
+  // Start the game loop
+  gameLoop();
 }
 
-// Populate level selector
-populateLevelSelector();
-
-gameLoop();
+// Start initialization
+initializeGame();
