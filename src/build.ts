@@ -9,6 +9,8 @@ Bun.build({
     "synth2.ogg",
     "DSEG7ClassicMini-Bold.woff2",
     "polaritypenguin.webp",
+    "penguin.png",
+    "fish.png",
   ],
 });
 

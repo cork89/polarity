@@ -80,11 +80,11 @@ const cell = row[x];
 
 ```
 /Users/sean/code/reddit/polarity/
-├── index.ts        # Main game logic
-├── index.html      # Game HTML
-├── editor.ts       # Level editor logic
-├── editor.html     # Editor HTML
-├── server.ts       # Bun dev server (serves fonts correctly)
+├── src/game.ts        # Main game logic
+├── src/game.html      # Game HTML
+├── src/editor.ts       # Level editor logic
+├── src/editor.html     # Editor HTML
+├── src/server.ts       # Bun dev server (serves fonts correctly)
 ├── package.json    # Bun dependencies
 └── tsconfig.json   # TypeScript config
 ```

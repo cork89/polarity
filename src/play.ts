@@ -3,6 +3,37 @@ if (!gameCanvas) {
   throw new Error("failed");
 }
 const gameCtx = gameCanvas.getContext("2d")!;
+
+// Load player image
+const playerImage = new Image();
+playerImage.src = "penguin.png";
+let playerImageLoaded = false;
+playerImage.onload = () => {
+  playerImageLoaded = true;
+};
+
+// Load target image
+const targetImage = new Image();
+targetImage.src = "fish.png";
+let targetImageLoaded = false;
+targetImage.onload = () => {
+  targetImageLoaded = true;
+};
+
+// Load attractor images
+const blueAttractorImage = new Image();
+blueAttractorImage.src = "iceBlockAlt.png";
+let blueAttractorImageLoaded = false;
+blueAttractorImage.onload = () => {
+  blueAttractorImageLoaded = true;
+};
+
+const redAttractorImage = new Image();
+redAttractorImage.src = "iceBlockAltRed.png";
+let redAttractorImageLoaded = false;
+redAttractorImage.onload = () => {
+  redAttractorImageLoaded = true;
+};
 const scoreFont = document.getElementById(
   "scoreFont",
 ) as HTMLSpanElement | null;
@@ -26,12 +57,16 @@ const gameOverButton = document.getElementById(
 ) as HTMLButtonElement | null;
 
 // Game settings
-const GRID_SIZE = 6;
-const CELL_SIZE = gameCanvas.width / GRID_SIZE;
+const PLAY_GRID_SIZE = 6;
+const PLAY_CELL_SIZE = gameCanvas.width / PLAY_GRID_SIZE;
 const PLAYER_SIZE = 25;
 const TARGET_SIZE = 22;
 const ATTRACTOR_SIZE = 22;
 const GRAVITY = 0.0625;
+
+// Physics speed multiplier - INCREASE this if game is too slow, DECREASE if too fast
+// 1.0 = original speed, 2.0 = twice as fast, 0.5 = half speed
+const PHYSICS_SPEED = 1.0;
 
 // Game modes
 type GameMode = "timeAttack" | "sprint" | "staged";
@@ -206,10 +241,10 @@ function fadeAudio(
 
 // Convert grid coordinates to pixel coordinates
 function gridToPixel(gridX: number, gridY: number): { x: number; y: number } {
-  const padding = (CELL_SIZE - TARGET_SIZE) / 2;
+  const padding = (PLAY_CELL_SIZE - TARGET_SIZE) / 2;
   return {
-    x: gridX * CELL_SIZE + padding,
-    y: gridY * CELL_SIZE + padding,
+    x: gridX * PLAY_CELL_SIZE + padding,
+    y: gridY * PLAY_CELL_SIZE + padding,
   };
 }
 
@@ -222,10 +257,10 @@ function parseGrid(grid: string[][]) {
   const targs: Target[] = [];
   const wallList: Wall[] = [];
 
-  for (let y = 0; y < GRID_SIZE; y++) {
+  for (let y = 0; y < PLAY_GRID_SIZE; y++) {
     const row = grid[y];
     if (!row) continue;
-    for (let x = 0; x < GRID_SIZE; x++) {
+    for (let x = 0; x < PLAY_GRID_SIZE; x++) {
       const cell = row[x];
       switch (cell) {
         case "P":
@@ -242,7 +277,7 @@ function parseGrid(grid: string[][]) {
           targs.push({ ...gridToPixel(x, y), collected: false });
           break;
         case "W":
-          wallList.push({ x: x * CELL_SIZE, y: y * CELL_SIZE });
+          wallList.push({ x: x * PLAY_CELL_SIZE, y: y * PLAY_CELL_SIZE });
           break;
       }
     }
@@ -279,9 +314,9 @@ function normalizeLevelData(
         y !== undefined &&
         x !== undefined &&
         y >= 0 &&
-        y < GRID_SIZE &&
+        y < PLAY_GRID_SIZE &&
         x >= 0 &&
-        x < GRID_SIZE
+        x < PLAY_GRID_SIZE
       ) {
         const row = mergedGrid[y];
         if (row) {
@@ -343,9 +378,9 @@ function loadLevel(
 
   // Only set player position on initial load, not stage progression
   if (resetState) {
-    const playerOffset = (CELL_SIZE - PLAYER_SIZE) / 2;
-    player.x = playerX * CELL_SIZE + playerOffset;
-    player.y = playerY * CELL_SIZE + playerOffset;
+    const playerOffset = (PLAY_CELL_SIZE - PLAYER_SIZE) / 2;
+    player.x = playerX * PLAY_CELL_SIZE + playerOffset;
+    player.y = playerY * PLAY_CELL_SIZE + playerOffset;
   }
 
   // Load attractors, targets, and walls
@@ -368,9 +403,9 @@ function isValidTargetPosition(x: number, y: number): boolean {
   // Check walls
   for (const wall of walls) {
     if (
-      x < wall.x + CELL_SIZE &&
+      x < wall.x + PLAY_CELL_SIZE &&
       x + TARGET_SIZE > wall.x &&
-      y < wall.y + CELL_SIZE &&
+      y < wall.y + PLAY_CELL_SIZE &&
       y + TARGET_SIZE > wall.y
     ) {
       return false;
@@ -408,10 +443,10 @@ function isValidTargetPosition(x: number, y: number): boolean {
 function spawnRandomTargets() {
   targets = [];
   // Spawn green squares along the right edge
-  for (let i = 0; i < GRID_SIZE; i++) {
+  for (let i = 0; i < PLAY_GRID_SIZE; i++) {
     if (Math.random() > 0.5) {
-      const targetX = CELL_SIZE * 5 + (CELL_SIZE - TARGET_SIZE) / 2;
-      const targetY = CELL_SIZE * i + (CELL_SIZE - TARGET_SIZE) / 2;
+      const targetX = PLAY_CELL_SIZE * 5 + (PLAY_CELL_SIZE - TARGET_SIZE) / 2;
+      const targetY = PLAY_CELL_SIZE * i + (PLAY_CELL_SIZE - TARGET_SIZE) / 2;
       if (isValidTargetPosition(targetX, targetY)) {
         targets.push({
           x: targetX,
@@ -424,9 +459,9 @@ function spawnRandomTargets() {
   // Also spawn some elsewhere
   for (let i = 0; i < 3; i++) {
     const gridX = Math.floor(Math.random() * 4);
-    const gridY = Math.floor(Math.random() * GRID_SIZE);
-    const targetX = CELL_SIZE * gridX + (CELL_SIZE - TARGET_SIZE) / 2;
-    const targetY = CELL_SIZE * gridY + (CELL_SIZE - TARGET_SIZE) / 2;
+    const gridY = Math.floor(Math.random() * PLAY_GRID_SIZE);
+    const targetX = PLAY_CELL_SIZE * gridX + (PLAY_CELL_SIZE - TARGET_SIZE) / 2;
+    const targetY = PLAY_CELL_SIZE * gridY + (PLAY_CELL_SIZE - TARGET_SIZE) / 2;
     if (isValidTargetPosition(targetX, targetY)) {
       targets.push({
         x: targetX,
@@ -441,15 +476,15 @@ function spawnRandomTargets() {
 function loadDefaultLevel() {
   redAttractors = [
     {
-      x: CELL_SIZE * 5 + (CELL_SIZE - ATTRACTOR_SIZE) / 2,
-      y: (CELL_SIZE - ATTRACTOR_SIZE) / 2,
+      x: PLAY_CELL_SIZE * 5 + (PLAY_CELL_SIZE - ATTRACTOR_SIZE) / 2,
+      y: (PLAY_CELL_SIZE - ATTRACTOR_SIZE) / 2,
     },
   ];
 
   blueAttractors = [
     {
-      x: CELL_SIZE * 2 + (CELL_SIZE - ATTRACTOR_SIZE) / 2,
-      y: CELL_SIZE * 3 + (CELL_SIZE - ATTRACTOR_SIZE) / 2,
+      x: PLAY_CELL_SIZE * 2 + (PLAY_CELL_SIZE - ATTRACTOR_SIZE) / 2,
+      y: PLAY_CELL_SIZE * 3 + (PLAY_CELL_SIZE - ATTRACTOR_SIZE) / 2,
     },
   ];
 
@@ -619,6 +654,24 @@ function setupArcadeButton(button: HTMLElement | null, key: "z" | "x") {
 setupArcadeButton(btnZ, "z");
 setupArcadeButton(btnX, "x");
 
+// Sync button visual state with keys object (called every frame)
+function syncButtonVisuals() {
+  if (btnZ) {
+    if (keys.z) {
+      btnZ.classList.add("active");
+    } else {
+      btnZ.classList.remove("active");
+    }
+  }
+  if (btnX) {
+    if (keys.x) {
+      btnX.classList.add("active");
+    } else {
+      btnX.classList.remove("active");
+    }
+  }
+}
+
 // Restart game on key press when game over
 document.addEventListener("keydown", (e) => {
   if (isGameOver && e.key.toLowerCase() === " ") {
@@ -652,7 +705,7 @@ function applyAttraction() {
     const dist = Math.sqrt(dx * dx + dy * dy);
 
     if (dist > 10) {
-      const force = 400 / (dist * dist + 200);
+      const force = (400 / (dist * dist + 200)) * PHYSICS_SPEED;
       // Accumulate velocity towards magnets without any damping
       player.vx += (dx / dist) * force;
       player.vy += (dy / dist) * force;
@@ -667,12 +720,12 @@ function updatePlayer() {
     player.hasAttracted = true;
   }
   if (player.hasAttracted && !isAttracting) {
-    player.vy += GRAVITY;
+    player.vy += GRAVITY * PHYSICS_SPEED;
   }
 
   // Update position
-  player.x += player.vx;
-  player.y += player.vy;
+  player.x += player.vx * PHYSICS_SPEED;
+  player.y += player.vy * PHYSICS_SPEED;
 
   // Boundary collision - stop at boundaries without bouncing
   if (player.x < 0) {
@@ -696,16 +749,16 @@ function updatePlayer() {
   walls.forEach((wall) => {
     // Check if player intersects with wall
     if (
-      player.x < wall.x + CELL_SIZE &&
+      player.x < wall.x + PLAY_CELL_SIZE &&
       player.x + player.size > wall.x &&
-      player.y < wall.y + CELL_SIZE &&
+      player.y < wall.y + PLAY_CELL_SIZE &&
       player.y + player.size > wall.y
     ) {
       // Determine which side of the wall the player hit
       const overlapLeft = player.x + player.size - wall.x;
-      const overlapRight = wall.x + CELL_SIZE - player.x;
+      const overlapRight = wall.x + PLAY_CELL_SIZE - player.x;
       const overlapTop = player.y + player.size - wall.y;
-      const overlapBottom = wall.y + CELL_SIZE - player.y;
+      const overlapBottom = wall.y + PLAY_CELL_SIZE - player.y;
 
       // Find the smallest overlap
       const minOverlap = Math.min(
@@ -720,13 +773,13 @@ function updatePlayer() {
         player.x = wall.x - player.size;
         player.vx = 0;
       } else if (minOverlap === overlapRight) {
-        player.x = wall.x + CELL_SIZE;
+        player.x = wall.x + PLAY_CELL_SIZE;
         player.vx = 0;
       } else if (minOverlap === overlapTop) {
         player.y = wall.y - player.size;
         player.vy = 0;
       } else if (minOverlap === overlapBottom) {
-        player.y = wall.y + CELL_SIZE;
+        player.y = wall.y + PLAY_CELL_SIZE;
         player.vy = 0;
       }
     }
@@ -823,59 +876,74 @@ function drawGrid() {
   gameCtx.strokeStyle = COLOR_GRID;
   gameCtx.lineWidth = 2;
 
-  for (let i = 0; i <= GRID_SIZE; i++) {
+  for (let i = 0; i <= PLAY_GRID_SIZE; i++) {
     gameCtx.beginPath();
-    gameCtx.moveTo(i * CELL_SIZE, 0);
-    gameCtx.lineTo(i * CELL_SIZE, gameCanvas.height);
+    gameCtx.moveTo(i * PLAY_CELL_SIZE, 0);
+    gameCtx.lineTo(i * PLAY_CELL_SIZE, gameCanvas.height);
     gameCtx.stroke();
 
     gameCtx.beginPath();
-    gameCtx.moveTo(0, i * CELL_SIZE);
-    gameCtx.lineTo(gameCanvas.width, i * CELL_SIZE);
+    gameCtx.moveTo(0, i * PLAY_CELL_SIZE);
+    gameCtx.lineTo(gameCanvas.width, i * PLAY_CELL_SIZE);
     gameCtx.stroke();
   }
 }
 
 function drawAttractors() {
   // Red attractors
-  gameCtx.fillStyle = COLOR_RED_ATTRACTOR_OUTER;
   redAttractors.forEach((a) => {
-    gameCtx.fillRect(a.x, a.y, ATTRACTOR_SIZE, ATTRACTOR_SIZE);
-    // Inner detail
-    gameCtx.fillStyle = COLOR_RED_ATTRACTOR_INNER;
-    gameCtx.fillRect(
-      a.x + 5,
-      a.y + 5,
-      ATTRACTOR_SIZE - 10,
-      ATTRACTOR_SIZE - 10,
-    );
-    gameCtx.fillStyle = COLOR_RED_ATTRACTOR_OUTER;
+    if (redAttractorImageLoaded) {
+      gameCtx.drawImage(redAttractorImage, a.x, a.y, ATTRACTOR_SIZE, ATTRACTOR_SIZE);
+    } else {
+      // Fallback to rectangle drawing
+      gameCtx.fillStyle = COLOR_RED_ATTRACTOR_OUTER;
+      gameCtx.fillRect(a.x, a.y, ATTRACTOR_SIZE, ATTRACTOR_SIZE);
+      // Inner detail
+      gameCtx.fillStyle = COLOR_RED_ATTRACTOR_INNER;
+      gameCtx.fillRect(
+        a.x + 5,
+        a.y + 5,
+        ATTRACTOR_SIZE - 10,
+        ATTRACTOR_SIZE - 10,
+      );
+      gameCtx.fillStyle = COLOR_RED_ATTRACTOR_OUTER;
+    }
   });
 
   // Blue attractors
-  gameCtx.fillStyle = COLOR_BLUE_ATTRACTOR_OUTER;
   blueAttractors.forEach((a) => {
-    gameCtx.fillRect(a.x, a.y, ATTRACTOR_SIZE, ATTRACTOR_SIZE);
-    // Inner detail
-    gameCtx.fillStyle = COLOR_BLUE_ATTRACTOR_INNER;
-    gameCtx.fillRect(
-      a.x + 5,
-      a.y + 5,
-      ATTRACTOR_SIZE - 10,
-      ATTRACTOR_SIZE - 10,
-    );
-    gameCtx.fillStyle = COLOR_BLUE_ATTRACTOR_OUTER;
+    if (blueAttractorImageLoaded) {
+      gameCtx.drawImage(blueAttractorImage, a.x, a.y, ATTRACTOR_SIZE, ATTRACTOR_SIZE);
+    } else {
+      // Fallback to rectangle drawing
+      gameCtx.fillStyle = COLOR_BLUE_ATTRACTOR_OUTER;
+      gameCtx.fillRect(a.x, a.y, ATTRACTOR_SIZE, ATTRACTOR_SIZE);
+      // Inner detail
+      gameCtx.fillStyle = COLOR_BLUE_ATTRACTOR_INNER;
+      gameCtx.fillRect(
+        a.x + 5,
+        a.y + 5,
+        ATTRACTOR_SIZE - 10,
+        ATTRACTOR_SIZE - 10,
+      );
+      gameCtx.fillStyle = COLOR_BLUE_ATTRACTOR_OUTER;
+    }
   });
 }
 
 function drawTargets() {
   targets.forEach((t) => {
     if (!t.collected) {
-      gameCtx.fillStyle = COLOR_TARGET_OUTER;
-      gameCtx.fillRect(t.x, t.y, TARGET_SIZE, TARGET_SIZE);
-      // Inner detail
-      gameCtx.fillStyle = COLOR_TARGET_INNER;
-      gameCtx.fillRect(t.x + 5, t.y + 5, TARGET_SIZE - 10, TARGET_SIZE - 10);
+      if (targetImageLoaded) {
+        gameCtx.drawImage(targetImage, t.x, t.y, TARGET_SIZE, TARGET_SIZE);
+      } else {
+        // Fallback to rectangle drawing
+        gameCtx.fillStyle = COLOR_TARGET_OUTER;
+        gameCtx.fillRect(t.x, t.y, TARGET_SIZE, TARGET_SIZE);
+        // Inner detail
+        gameCtx.fillStyle = COLOR_TARGET_INNER;
+        gameCtx.fillRect(t.x + 5, t.y + 5, TARGET_SIZE - 10, TARGET_SIZE - 10);
+      }
     }
   });
 }
@@ -883,32 +951,53 @@ function drawTargets() {
 function drawWalls() {
   walls.forEach((w) => {
     gameCtx.fillStyle = COLOR_WALL_OUTER;
-    gameCtx.fillRect(w.x, w.y, CELL_SIZE, CELL_SIZE);
+    gameCtx.fillRect(w.x, w.y, PLAY_CELL_SIZE, PLAY_CELL_SIZE);
     // Inner detail
     gameCtx.fillStyle = COLOR_WALL_INNER;
-    gameCtx.fillRect(w.x + 2, w.y + 2, CELL_SIZE - 4, CELL_SIZE - 4);
+    gameCtx.fillRect(w.x + 2, w.y + 2, PLAY_CELL_SIZE - 4, PLAY_CELL_SIZE - 4);
   });
 }
 
 function drawPlayer() {
-  // Draw trail
+  // Draw trail - narrower to avoid showing through transparent sides of penguin image
+  const trailWidth = player.size * 0.6;
+  const trailOffsetX = (player.size - trailWidth) / 2;
   player.trail.forEach((t, i) => {
     gameCtx.fillStyle = `rgba(150, 150, 150, ${t.alpha * 0.3})`;
-    gameCtx.fillRect(t.x, t.y, player.size, player.size);
+    gameCtx.fillRect(t.x + trailOffsetX, t.y, trailWidth, player.size);
   });
 
-  // Draw player
-  gameCtx.fillStyle = COLOR_PLAYER_OUTER;
-  gameCtx.fillRect(player.x, player.y, player.size, player.size);
+  // Draw player image (or fallback to rectangle if not loaded)
+  if (playerImageLoaded) {
+    // Calculate rotation based on horizontal velocity (tilt left/right)
+    const maxTilt = Math.PI / 6; // 30 degrees max rotation
+    const tilt = Math.max(-maxTilt, Math.min(maxTilt, player.vx * 0.05));
 
-  // Player inner detail
-  gameCtx.fillStyle = COLOR_PLAYER_INNER;
-  gameCtx.fillRect(
-    player.x + 5,
-    player.y + 5,
-    player.size - 10,
-    player.size - 10,
-  );
+    // Save context, translate to center, rotate, draw, restore
+    // Hitbox remains unchanged - only visual rotation
+    gameCtx.save();
+    gameCtx.translate(player.x + player.size / 2, player.y + player.size / 2);
+    gameCtx.rotate(tilt);
+    gameCtx.drawImage(
+      playerImage,
+      -player.size / 2,
+      -player.size / 2,
+      player.size,
+      player.size,
+    );
+    gameCtx.restore();
+  } else {
+    // Fallback to rectangle drawing
+    gameCtx.fillStyle = COLOR_PLAYER_OUTER;
+    gameCtx.fillRect(player.x, player.y, player.size, player.size);
+    gameCtx.fillStyle = COLOR_PLAYER_INNER;
+    gameCtx.fillRect(
+      player.x + 5,
+      player.y + 5,
+      player.size - 10,
+      player.size - 10,
+    );
+  }
 }
 
 function drawParticles() {
@@ -1024,6 +1113,9 @@ function restartGame() {
 
 // Main game loop
 function gameLoop() {
+  // Sync button visuals with key state (handles iOS touch desync issues)
+  syncButtonVisuals();
+
   // Update sound effects based on connection state
   const now = Date.now();
 
@@ -1088,7 +1180,7 @@ function gameLoop() {
     // Update timer
     updateTimer();
 
-    // Update physics
+    // Run physics once per frame (speed controlled by PHYSICS_SPEED constant)
     applyAttraction();
     updatePlayer();
     checkCollisions();

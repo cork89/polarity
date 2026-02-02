@@ -5,8 +5,8 @@
   "private": true,
   "scripts": {
     "build": "cd src && bun run build.ts",
-    "dev": "bun src/server.ts",
-    "start": "cd dist && bun server.ts"
+    "dev": "cd dist && bun run server.ts",
+    "start": "bun run build && bun run dev"
   },
   "dependencies": {
     "@devvit/web": "0.12.10",
