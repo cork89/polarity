@@ -1,18 +1,30 @@
-const canvas = document.getElementById("gameCanvas") as HTMLCanvasElement;
-if (!canvas) {
-    throw new Error("failed")
+const gameCanvas = document.getElementById("gameCanvas") as HTMLCanvasElement;
+if (!gameCanvas) {
+  throw new Error("failed");
 }
-const ctx = canvas.getContext("2d")!;
-const scoreFont = document.getElementById("scoreFont") as HTMLSpanElement | null;
-const timerFont = document.getElementById("timerFont") as HTMLSpanElement | null;
-const levelSelect = document.getElementById("levelSelect") as HTMLSelectElement | null;
-const gameOverOverlay = document.getElementById("gameOverOverlay") as HTMLDivElement | null;
-const gameOverTitle = document.getElementById("gameOverTitle") as HTMLDivElement | null;
-const gameOverScore = document.getElementById("gameOverScore") as HTMLDivElement | null;
+const gameCtx = gameCanvas.getContext("2d")!;
+const scoreFont = document.getElementById(
+  "scoreFont",
+) as HTMLSpanElement | null;
+const timerFont = document.getElementById(
+  "timerFont",
+) as HTMLSpanElement | null;
+const levelSelect = document.getElementById(
+  "levelSelect",
+) as HTMLSelectElement | null;
+const gameOverOverlay = document.getElementById(
+  "gameOverOverlay",
+) as HTMLDivElement | null;
+const gameOverTitle = document.getElementById(
+  "gameOverTitle",
+) as HTMLDivElement | null;
+const gameOverScore = document.getElementById(
+  "gameOverScore",
+) as HTMLDivElement | null;
 
 // Game settings
 const GRID_SIZE = 6;
-const CELL_SIZE = canvas.width / GRID_SIZE;
+const CELL_SIZE = gameCanvas.width / GRID_SIZE;
 const PLAYER_SIZE = 40;
 const TARGET_SIZE = 35;
 const ATTRACTOR_SIZE = 35;
@@ -42,7 +54,11 @@ const COLOR_ATTRACTION_LINE_RED = "rgba(255, 100, 100, 0.3)";
 const COLOR_ATTRACTION_LINE_BLUE = "rgba(100, 100, 255, 0.3)";
 
 // Update font-based displays
-function updateFontDisplay(element: HTMLSpanElement | null, value: number, maxDigits: number) {
+function updateFontDisplay(
+  element: HTMLSpanElement | null,
+  value: number,
+  maxDigits: number,
+) {
   if (!element) return;
   element.textContent = Math.floor(value).toString().padStart(maxDigits, " ");
 }
@@ -123,8 +139,8 @@ let sprintTimeElapsed = 0;
 
 // Player object
 const player: Player = {
-  x: canvas.width / 2 - PLAYER_SIZE / 2,
-  y: canvas.height / 2 - PLAYER_SIZE / 2,
+  x: gameCanvas.width / 2 - PLAYER_SIZE / 2,
+  y: gameCanvas.height / 2 - PLAYER_SIZE / 2,
   vx: 0,
   vy: 0,
   size: PLAYER_SIZE,
@@ -164,20 +180,24 @@ const MAX_VOLUME = 0.2;
 let blueFadeStartTime: number | null = null;
 let redFadeStartTime: number | null = null;
 
-function fadeAudio(sound: HTMLAudioElement, fadeStartTime: number | null, currentTime: number): number | null {
+function fadeAudio(
+  sound: HTMLAudioElement,
+  fadeStartTime: number | null,
+  currentTime: number,
+): number | null {
   if (fadeStartTime === null) return null;
-  
+
   const elapsed = currentTime - fadeStartTime;
   const progress = Math.min(elapsed / FADE_DURATION, 1);
-  
+
   sound.volume = MAX_VOLUME * (1 - progress);
-  
+
   if (progress >= 1) {
     sound.pause();
     sound.volume = MAX_VOLUME;
     return null;
   }
-  
+
   return fadeStartTime;
 }
 
@@ -192,7 +212,8 @@ function gridToPixel(gridX: number, gridY: number): { x: number; y: number } {
 
 // Parse grid and extract objects
 function parseGrid(grid: string[][]) {
-  let playerX = 2, playerY = 2;
+  let playerX = 2,
+    playerY = 2;
   const reds: Attractor[] = [];
   const blues: Attractor[] = [];
   const targs: Target[] = [];
@@ -229,7 +250,10 @@ function parseGrid(grid: string[][]) {
 
 // Normalize level data - convert both old and new formats to a usable grid
 // For multi-stage levels, merges baseGrid with current stage targets
-function normalizeLevelData(levelData: LevelData, stageIndex: number = 0): string[][] | null {
+function normalizeLevelData(
+  levelData: LevelData,
+  stageIndex: number = 0,
+): string[][] | null {
   // Old format: just return the grid
   if (levelData.grid) {
     return levelData.grid;
@@ -242,13 +266,20 @@ function normalizeLevelData(levelData: LevelData, stageIndex: number = 0): strin
     if (!stage) return null;
 
     // Create a copy of baseGrid
-    const mergedGrid: string[][] = baseGrid.map(row => [...row]);
+    const mergedGrid: string[][] = baseGrid.map((row) => [...row]);
 
     // Add targets from this stage
     for (const target of stage.targets) {
       const y = target.y;
       const x = target.x;
-      if (y !== undefined && x !== undefined && y >= 0 && y < GRID_SIZE && x >= 0 && x < GRID_SIZE) {
+      if (
+        y !== undefined &&
+        x !== undefined &&
+        y >= 0 &&
+        y < GRID_SIZE &&
+        x >= 0 &&
+        x < GRID_SIZE
+      ) {
         const row = mergedGrid[y];
         if (row) {
           row[x] = "T";
@@ -263,12 +294,16 @@ function normalizeLevelData(levelData: LevelData, stageIndex: number = 0): strin
 }
 
 // Load level from data
-function loadLevel(levelData: LevelData, stageIndex: number = 0, resetState: boolean = true) {
+function loadLevel(
+  levelData: LevelData,
+  stageIndex: number = 0,
+  resetState: boolean = true,
+) {
   // Store level data for stage progression
   currentLevelData = levelData;
   currentStageIndex = stageIndex;
   totalStages = levelData.stages?.length || 1;
-  
+
   // Set game mode from level (default to staged for backward compatibility)
   currentGameMode = levelData.gameMode || "staged";
 
@@ -415,8 +450,8 @@ function loadDefaultLevel() {
     },
   ];
 
-  player.x = canvas.width / 2 - PLAYER_SIZE / 2;
-  player.y = canvas.height / 2 - PLAYER_SIZE / 2;
+  player.x = gameCanvas.width / 2 - PLAYER_SIZE / 2;
+  player.y = gameCanvas.height / 2 - PLAYER_SIZE / 2;
   player.vx = 0;
   player.vy = 0;
   player.trail = [];
@@ -475,7 +510,7 @@ function populateLevelSelector() {
 
   // Select current level if loaded from hash
   if (currentLevelName) {
-    const index = levels.findIndex(l => l.name === currentLevelName);
+    const index = levels.findIndex((l) => l.name === currentLevelName);
     if (index !== -1) {
       levelSelect.value = String(index);
     }
@@ -509,7 +544,10 @@ function checkForEditorLevel() {
       const decoded = decodeURIComponent(hash);
       const data = JSON.parse(decoded);
       // Support both old format (level.grid) and new multi-stage format (level.baseGrid + level.stages)
-      if (data.level && (data.level.grid || (data.level.baseGrid && data.level.stages))) {
+      if (
+        data.level &&
+        (data.level.grid || (data.level.baseGrid && data.level.stages))
+      ) {
         loadLevel(data.level);
         // Remove hash to prevent reloading on refresh
         history.replaceState(null, "", window.location.pathname);
@@ -551,10 +589,7 @@ document.addEventListener("keyup", (e) => {
 const btnZ = document.getElementById("btnZ");
 const btnX = document.getElementById("btnX");
 
-function setupArcadeButton(
-  button: HTMLElement | null,
-  key: "z" | "x"
-) {
+function setupArcadeButton(button: HTMLElement | null, key: "z" | "x") {
   if (!button) return;
 
   const startHandler = (e: Event) => {
@@ -583,7 +618,6 @@ setupArcadeButton(btnX, "x");
 
 // Restart game on key press when game over
 document.addEventListener("keydown", (e) => {
-  
   if (isGameOver && e.key.toLowerCase() === " ") {
     restartGame();
   }
@@ -633,16 +667,16 @@ function updatePlayer() {
     player.x = 0;
     player.vx = 0;
   }
-  if (player.x + player.size > canvas.width) {
-    player.x = canvas.width - player.size;
+  if (player.x + player.size > gameCanvas.width) {
+    player.x = gameCanvas.width - player.size;
     player.vx = 0;
   }
   if (player.y < 0) {
     player.y = 0;
     player.vy = 0;
   }
-  if (player.y + player.size > canvas.height) {
-    player.y = canvas.height - player.size;
+  if (player.y + player.size > gameCanvas.height) {
+    player.y = gameCanvas.height - player.size;
     player.vy = 0;
   }
 
@@ -656,13 +690,18 @@ function updatePlayer() {
       player.y + player.size > wall.y
     ) {
       // Determine which side of the wall the player hit
-      const overlapLeft = (player.x + player.size) - wall.x;
-      const overlapRight = (wall.x + CELL_SIZE) - player.x;
-      const overlapTop = (player.y + player.size) - wall.y;
-      const overlapBottom = (wall.y + CELL_SIZE) - player.y;
+      const overlapLeft = player.x + player.size - wall.x;
+      const overlapRight = wall.x + CELL_SIZE - player.x;
+      const overlapTop = player.y + player.size - wall.y;
+      const overlapBottom = wall.y + CELL_SIZE - player.y;
 
       // Find the smallest overlap
-      const minOverlap = Math.min(overlapLeft, overlapRight, overlapTop, overlapBottom);
+      const minOverlap = Math.min(
+        overlapLeft,
+        overlapRight,
+        overlapTop,
+        overlapBottom,
+      );
 
       // Push player out based on smallest overlap
       if (minOverlap === overlapLeft) {
@@ -711,8 +750,13 @@ function checkCollisions() {
 
         // Check for Staged mode - all targets collected in all stages
         if (currentGameMode === "staged") {
-          const allTargetsInCurrentStageCollected = targets.every((t) => t.collected);
-          if (allTargetsInCurrentStageCollected && currentStageIndex >= totalStages - 1) {
+          const allTargetsInCurrentStageCollected = targets.every(
+            (t) => t.collected,
+          );
+          if (
+            allTargetsInCurrentStageCollected &&
+            currentStageIndex >= totalStages - 1
+          ) {
             isGameOver = true;
           }
         }
@@ -735,9 +779,17 @@ function checkCollisions() {
   // Check if all targets collected
   if (targets.every((t) => t.collected)) {
     // Respawn random targets for timeAttack/sprint modes or default/random mode
-    if (!currentLevelName || currentGameMode === "timeAttack" || currentGameMode === "sprint") {
+    if (
+      !currentLevelName ||
+      currentGameMode === "timeAttack" ||
+      currentGameMode === "sprint"
+    ) {
       spawnRandomTargets();
-    } else if (currentLevelData && currentLevelData.stages && currentStageIndex < totalStages - 1) {
+    } else if (
+      currentLevelData &&
+      currentLevelData.stages &&
+      currentStageIndex < totalStages - 1
+    ) {
       // Multi-stage level: advance to next stage (keep player position)
       currentStageIndex++;
       loadLevel(currentLevelData, currentStageIndex, false);
@@ -756,110 +808,125 @@ function updateParticles() {
 
 // Drawing functions
 function drawGrid() {
-  ctx.strokeStyle = COLOR_GRID;
-  ctx.lineWidth = 2;
+  gameCtx.strokeStyle = COLOR_GRID;
+  gameCtx.lineWidth = 2;
 
   for (let i = 0; i <= GRID_SIZE; i++) {
-    ctx.beginPath();
-    ctx.moveTo(i * CELL_SIZE, 0);
-    ctx.lineTo(i * CELL_SIZE, canvas.height);
-    ctx.stroke();
+    gameCtx.beginPath();
+    gameCtx.moveTo(i * CELL_SIZE, 0);
+    gameCtx.lineTo(i * CELL_SIZE, gameCanvas.height);
+    gameCtx.stroke();
 
-    ctx.beginPath();
-    ctx.moveTo(0, i * CELL_SIZE);
-    ctx.lineTo(canvas.width, i * CELL_SIZE);
-    ctx.stroke();
+    gameCtx.beginPath();
+    gameCtx.moveTo(0, i * CELL_SIZE);
+    gameCtx.lineTo(gameCanvas.width, i * CELL_SIZE);
+    gameCtx.stroke();
   }
 }
 
 function drawAttractors() {
   // Red attractors
-  ctx.fillStyle = COLOR_RED_ATTRACTOR_OUTER;
+  gameCtx.fillStyle = COLOR_RED_ATTRACTOR_OUTER;
   redAttractors.forEach((a) => {
-    ctx.fillRect(a.x, a.y, ATTRACTOR_SIZE, ATTRACTOR_SIZE);
+    gameCtx.fillRect(a.x, a.y, ATTRACTOR_SIZE, ATTRACTOR_SIZE);
     // Inner detail
-    ctx.fillStyle = COLOR_RED_ATTRACTOR_INNER;
-    ctx.fillRect(a.x + 5, a.y + 5, ATTRACTOR_SIZE - 10, ATTRACTOR_SIZE - 10);
-    ctx.fillStyle = COLOR_RED_ATTRACTOR_OUTER;
+    gameCtx.fillStyle = COLOR_RED_ATTRACTOR_INNER;
+    gameCtx.fillRect(
+      a.x + 5,
+      a.y + 5,
+      ATTRACTOR_SIZE - 10,
+      ATTRACTOR_SIZE - 10,
+    );
+    gameCtx.fillStyle = COLOR_RED_ATTRACTOR_OUTER;
   });
 
   // Blue attractors
-  ctx.fillStyle = COLOR_BLUE_ATTRACTOR_OUTER;
+  gameCtx.fillStyle = COLOR_BLUE_ATTRACTOR_OUTER;
   blueAttractors.forEach((a) => {
-    ctx.fillRect(a.x, a.y, ATTRACTOR_SIZE, ATTRACTOR_SIZE);
+    gameCtx.fillRect(a.x, a.y, ATTRACTOR_SIZE, ATTRACTOR_SIZE);
     // Inner detail
-    ctx.fillStyle = COLOR_BLUE_ATTRACTOR_INNER;
-    ctx.fillRect(a.x + 5, a.y + 5, ATTRACTOR_SIZE - 10, ATTRACTOR_SIZE - 10);
-    ctx.fillStyle = COLOR_BLUE_ATTRACTOR_OUTER;
+    gameCtx.fillStyle = COLOR_BLUE_ATTRACTOR_INNER;
+    gameCtx.fillRect(
+      a.x + 5,
+      a.y + 5,
+      ATTRACTOR_SIZE - 10,
+      ATTRACTOR_SIZE - 10,
+    );
+    gameCtx.fillStyle = COLOR_BLUE_ATTRACTOR_OUTER;
   });
 }
 
 function drawTargets() {
   targets.forEach((t) => {
     if (!t.collected) {
-      ctx.fillStyle = COLOR_TARGET_OUTER;
-      ctx.fillRect(t.x, t.y, TARGET_SIZE, TARGET_SIZE);
+      gameCtx.fillStyle = COLOR_TARGET_OUTER;
+      gameCtx.fillRect(t.x, t.y, TARGET_SIZE, TARGET_SIZE);
       // Inner detail
-      ctx.fillStyle = COLOR_TARGET_INNER;
-      ctx.fillRect(t.x + 5, t.y + 5, TARGET_SIZE - 10, TARGET_SIZE - 10);
+      gameCtx.fillStyle = COLOR_TARGET_INNER;
+      gameCtx.fillRect(t.x + 5, t.y + 5, TARGET_SIZE - 10, TARGET_SIZE - 10);
     }
   });
 }
 
 function drawWalls() {
   walls.forEach((w) => {
-    ctx.fillStyle = COLOR_WALL_OUTER;
-    ctx.fillRect(w.x, w.y, CELL_SIZE, CELL_SIZE);
+    gameCtx.fillStyle = COLOR_WALL_OUTER;
+    gameCtx.fillRect(w.x, w.y, CELL_SIZE, CELL_SIZE);
     // Inner detail
-    ctx.fillStyle = COLOR_WALL_INNER;
-    ctx.fillRect(w.x + 2, w.y + 2, CELL_SIZE - 4, CELL_SIZE - 4);
+    gameCtx.fillStyle = COLOR_WALL_INNER;
+    gameCtx.fillRect(w.x + 2, w.y + 2, CELL_SIZE - 4, CELL_SIZE - 4);
   });
 }
 
 function drawPlayer() {
   // Draw trail
   player.trail.forEach((t, i) => {
-    ctx.fillStyle = `rgba(150, 150, 150, ${t.alpha * 0.3})`;
-    ctx.fillRect(t.x, t.y, player.size, player.size);
+    gameCtx.fillStyle = `rgba(150, 150, 150, ${t.alpha * 0.3})`;
+    gameCtx.fillRect(t.x, t.y, player.size, player.size);
   });
 
   // Draw player
-  ctx.fillStyle = COLOR_PLAYER_OUTER;
-  ctx.fillRect(player.x, player.y, player.size, player.size);
+  gameCtx.fillStyle = COLOR_PLAYER_OUTER;
+  gameCtx.fillRect(player.x, player.y, player.size, player.size);
 
   // Player inner detail
-  ctx.fillStyle = COLOR_PLAYER_INNER;
-  ctx.fillRect(player.x + 5, player.y + 5, player.size - 10, player.size - 10);
+  gameCtx.fillStyle = COLOR_PLAYER_INNER;
+  gameCtx.fillRect(
+    player.x + 5,
+    player.y + 5,
+    player.size - 10,
+    player.size - 10,
+  );
 }
 
 function drawParticles() {
   particles.forEach((p) => {
-    ctx.fillStyle = p.color;
-    ctx.globalAlpha = p.life;
-    ctx.fillRect(p.x - 3, p.y - 3, 6, 6);
-    ctx.globalAlpha = 1;
+    gameCtx.fillStyle = p.color;
+    gameCtx.globalAlpha = p.life;
+    gameCtx.fillRect(p.x - 3, p.y - 3, 6, 6);
+    gameCtx.globalAlpha = 1;
   });
 }
 
 function drawAttractionLines() {
   if (keys.x) {
     redAttractors.forEach((a) => {
-      ctx.strokeStyle = COLOR_ATTRACTION_LINE_RED;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(player.x + player.size / 2, player.y + player.size / 2);
-      ctx.lineTo(a.x + ATTRACTOR_SIZE / 2, a.y + ATTRACTOR_SIZE / 2);
-      ctx.stroke();
+      gameCtx.strokeStyle = COLOR_ATTRACTION_LINE_RED;
+      gameCtx.lineWidth = 2;
+      gameCtx.beginPath();
+      gameCtx.moveTo(player.x + player.size / 2, player.y + player.size / 2);
+      gameCtx.lineTo(a.x + ATTRACTOR_SIZE / 2, a.y + ATTRACTOR_SIZE / 2);
+      gameCtx.stroke();
     });
   }
   if (keys.z) {
     blueAttractors.forEach((a) => {
-      ctx.strokeStyle = COLOR_ATTRACTION_LINE_BLUE;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(player.x + player.size / 2, player.y + player.size / 2);
-      ctx.lineTo(a.x + ATTRACTOR_SIZE / 2, a.y + ATTRACTOR_SIZE / 2);
-      ctx.stroke();
+      gameCtx.strokeStyle = COLOR_ATTRACTION_LINE_BLUE;
+      gameCtx.lineWidth = 2;
+      gameCtx.beginPath();
+      gameCtx.moveTo(player.x + player.size / 2, player.y + player.size / 2);
+      gameCtx.lineTo(a.x + ATTRACTOR_SIZE / 2, a.y + ATTRACTOR_SIZE / 2);
+      gameCtx.stroke();
     });
   }
 }
@@ -929,7 +996,7 @@ function restartGame() {
 
   if (currentLevelName) {
     const levels = getStoredLevels();
-    const level = levels.find(l => l.name === currentLevelName);
+    const level = levels.find((l) => l.name === currentLevelName);
     if (level) {
       loadLevel(level);
     } else {
@@ -947,7 +1014,7 @@ function restartGame() {
 function gameLoop() {
   // Update sound effects based on connection state
   const now = Date.now();
-  
+
   if (!isGameOver) {
     if (keys.z) {
       if (blueSound.paused) {
@@ -960,7 +1027,7 @@ function gameLoop() {
         blueFadeStartTime = now;
       }
     }
-    
+
     if (keys.x) {
       if (redSound.paused) {
         redSound.volume = MAX_VOLUME;
@@ -981,14 +1048,14 @@ function gameLoop() {
       redFadeStartTime = now;
     }
   }
-  
+
   // Apply fade out
   blueFadeStartTime = fadeAudio(blueSound, blueFadeStartTime, now);
   redFadeStartTime = fadeAudio(redSound, redFadeStartTime, now);
 
   // Clear canvas
-  ctx.fillStyle = COLOR_BACKGROUND;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  gameCtx.fillStyle = COLOR_BACKGROUND;
+  gameCtx.fillRect(0, 0, gameCanvas.width, gameCanvas.height);
 
   // Draw grid
   drawGrid();

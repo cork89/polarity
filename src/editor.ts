@@ -1,11 +1,13 @@
 // Level Editor for Polarity Game
 
-const canvas = document.getElementById("editorCanvas") as HTMLCanvasElement;
-const ctx = canvas.getContext("2d")!;
+const editorCanvas = document.getElementById(
+  "editorCanvas",
+) as HTMLCanvasElement;
+const editorCtx = editorCanvas.getContext("2d")!;
 
 // Grid settings
 const GRID_SIZE = 6;
-const CELL_SIZE = canvas.width / GRID_SIZE;
+const CELL_SIZE = editorCanvas.width / GRID_SIZE;
 
 // Tool types
 type Tool = "player" | "red" | "blue" | "target" | "wall" | "eraser";
@@ -23,11 +25,11 @@ const TOOL_TO_LETTER: Record<Tool, GridCell> = {
 };
 const LETTER_TO_TOOL: Record<GridCell, Tool | null> = {
   " ": null,
-  "P": "player",
-  "R": "red",
-  "B": "blue",
-  "T": "target",
-  "W": "wall",
+  P: "player",
+  R: "red",
+  B: "blue",
+  T: "target",
+  W: "wall",
 };
 
 // Stage data structure - only targets vary per stage
@@ -52,7 +54,10 @@ let levels: Level[] = [];
 let currentStageIndex: number = 0;
 
 // Create a new empty level with default stages
-function createEmptyLevel(name: string = "Untitled", gameMode: "timeAttack" | "sprint" | "staged" = "staged"): Level {
+function createEmptyLevel(
+  name: string = "Untitled",
+  gameMode: "timeAttack" | "sprint" | "staged" = "staged",
+): Level {
   // Create empty 6x6 base grid filled with spaces
   const baseGrid: GridCell[][] = [];
   for (let y = 0; y < GRID_SIZE; y++) {
@@ -130,7 +135,11 @@ function findTargetPositions(): { x: number; y: number }[] {
 
 // Check if a target is reachable from the player using BFS
 // A target is reachable if there's a path that doesn't go through walls
-function isTargetReachable(targetX: number, targetY: number, playerPos: { x: number; y: number }): boolean {
+function isTargetReachable(
+  targetX: number,
+  targetY: number,
+  playerPos: { x: number; y: number },
+): boolean {
   const visited: boolean[][] = [];
   for (let y = 0; y < GRID_SIZE; y++) {
     visited.push(new Array(GRID_SIZE).fill(false));
@@ -141,9 +150,9 @@ function isTargetReachable(targetX: number, targetY: number, playerPos: { x: num
 
   const directions = [
     { dx: 0, dy: -1 }, // up
-    { dx: 0, dy: 1 },  // down
+    { dx: 0, dy: 1 }, // down
     { dx: -1, dy: 0 }, // left
-    { dx: 1, dy: 0 },  // right
+    { dx: 1, dy: 0 }, // right
   ];
 
   while (queue.length > 0) {
@@ -188,7 +197,10 @@ function validateLevel(): { valid: boolean; error: string | null } {
   }
 
   // Time Attack and Sprint only need a player
-  if (currentLevel.gameMode === "timeAttack" || currentLevel.gameMode === "sprint") {
+  if (
+    currentLevel.gameMode === "timeAttack" ||
+    currentLevel.gameMode === "sprint"
+  ) {
     return { valid: true, error: null };
   }
 
@@ -203,7 +215,10 @@ function validateLevel(): { valid: boolean; error: string | null } {
 
     for (const target of stage.targets) {
       if (!isTargetReachable(target.x, target.y, playerPos)) {
-        return { valid: false, error: `Stage ${stageIdx + 1} has unreachable target` };
+        return {
+          valid: false,
+          error: `Stage ${stageIdx + 1} has unreachable target`,
+        };
       }
     }
   }
@@ -213,31 +228,40 @@ function validateLevel(): { valid: boolean; error: string | null } {
 
 // Update editor UI based on game mode
 function updateEditorForGameMode() {
-  const targetToolBtn = document.querySelector('[data-tool="target"]') as HTMLElement;
-  const stageSelector = document.querySelector('.stage-selector') as HTMLElement;
+  const targetToolBtn = document.querySelector(
+    '[data-tool="target"]',
+  ) as HTMLElement;
+  const stageSelector = document.querySelector(
+    ".stage-selector",
+  ) as HTMLElement;
   const targetCountEl = document.getElementById("targetCount")?.parentElement;
-  const gameModeSelect = document.getElementById("gameModeSelect") as HTMLSelectElement;
-  
+  const gameModeSelect = document.getElementById(
+    "gameModeSelect",
+  ) as HTMLSelectElement;
+
   // Update the game mode selector to match current level
   if (gameModeSelect) {
     gameModeSelect.value = currentLevel.gameMode;
   }
-  
-  if (currentLevel.gameMode === "timeAttack" || currentLevel.gameMode === "sprint") {
+
+  if (
+    currentLevel.gameMode === "timeAttack" ||
+    currentLevel.gameMode === "sprint"
+  ) {
     // Hide target-related UI
     if (targetToolBtn) targetToolBtn.style.display = "none";
     if (stageSelector) stageSelector.style.display = "none";
     if (targetCountEl) targetCountEl.style.display = "none";
-    
+
     // Clear any existing targets from stages
-    currentLevel.stages.forEach(stage => stage.targets = []);
+    currentLevel.stages.forEach((stage) => (stage.targets = []));
   } else {
     // Show all UI for staged mode
     if (targetToolBtn) targetToolBtn.style.display = "flex";
     if (stageSelector) stageSelector.style.display = "flex";
     if (targetCountEl) targetCountEl.style.display = "flex";
   }
-  
+
   draw();
   updateStats();
   updateValidationUI();
@@ -248,8 +272,10 @@ function updateValidationUI() {
   const validation = validateLevel();
   const saveBtn = document.getElementById("saveBtn") as HTMLButtonElement;
   const canvas = document.getElementById("editorCanvas") as HTMLCanvasElement;
-  const validationMessage = document.getElementById("validationMessage") as HTMLDivElement;
-  
+  const validationMessage = document.getElementById(
+    "validationMessage",
+  ) as HTMLDivElement;
+
   if (!validation.valid) {
     saveBtn.disabled = true;
     saveBtn.style.opacity = "0.5";
@@ -271,7 +297,8 @@ function updateValidationUI() {
 // Get object at grid position (merged view of base + current stage)
 function getObjectAt(gridX: number, gridY: number): GridCell {
   if (!isValidGridPos(gridX, gridY)) return " ";
-  if (!currentLevel || !currentLevel.baseGrid || !currentLevel.stages) return " ";
+  if (!currentLevel || !currentLevel.baseGrid || !currentLevel.stages)
+    return " ";
 
   // Check base grid first (P, R, B, W)
   const baseRow = currentLevel.baseGrid[gridY];
@@ -283,7 +310,7 @@ function getObjectAt(gridX: number, gridY: number): GridCell {
   // Check current stage for targets
   const stage = currentLevel.stages[currentStageIndex];
   if (stage) {
-    const target = stage.targets.find(t => t.x === gridX && t.y === gridY);
+    const target = stage.targets.find((t) => t.x === gridX && t.y === gridY);
     if (target) return "T";
   }
 
@@ -296,8 +323,11 @@ function placeObject(gridX: number, gridY: number) {
   if (!currentLevel || !currentLevel.baseGrid || !currentLevel.stages) return;
 
   // Prevent placing targets in Time Attack or Sprint modes
-  if (currentTool === "target" && 
-      (currentLevel.gameMode === "timeAttack" || currentLevel.gameMode === "sprint")) {
+  if (
+    currentTool === "target" &&
+    (currentLevel.gameMode === "timeAttack" ||
+      currentLevel.gameMode === "sprint")
+  ) {
     return;
   }
 
@@ -309,7 +339,9 @@ function placeObject(gridX: number, gridY: number) {
     if (!stage) return;
 
     // Check if target already exists at this position
-    const existingIndex = stage.targets.findIndex(t => t.x === gridX && t.y === gridY);
+    const existingIndex = stage.targets.findIndex(
+      (t) => t.x === gridX && t.y === gridY,
+    );
 
     if (existingIndex >= 0) {
       // Remove target
@@ -328,7 +360,9 @@ function placeObject(gridX: number, gridY: number) {
     // Also remove from current stage if it's a target
     const stage = currentLevel.stages[currentStageIndex];
     if (stage) {
-      const existingIndex = stage.targets.findIndex(t => t.x === gridX && t.y === gridY);
+      const existingIndex = stage.targets.findIndex(
+        (t) => t.x === gridX && t.y === gridY,
+      );
       if (existingIndex >= 0) {
         stage.targets.splice(existingIndex, 1);
       }
@@ -348,75 +382,92 @@ function placeObject(gridX: number, gridY: number) {
 
 // Drawing functions
 function drawGrid() {
-  ctx.strokeStyle = "#6a5a4a";
-  ctx.lineWidth = 2;
+  editorCtx.strokeStyle = "#6a5a4a";
+  editorCtx.lineWidth = 2;
 
   for (let i = 0; i <= GRID_SIZE; i++) {
-    ctx.beginPath();
-    ctx.moveTo(i * CELL_SIZE, 0);
-    ctx.lineTo(i * CELL_SIZE, canvas.height);
-    ctx.stroke();
+    editorCtx.beginPath();
+    editorCtx.moveTo(i * CELL_SIZE, 0);
+    editorCtx.lineTo(i * CELL_SIZE, editorCanvas.height);
+    editorCtx.stroke();
 
-    ctx.beginPath();
-    ctx.moveTo(0, i * CELL_SIZE);
-    ctx.lineTo(canvas.width, i * CELL_SIZE);
-    ctx.stroke();
+    editorCtx.beginPath();
+    editorCtx.moveTo(0, i * CELL_SIZE);
+    editorCtx.lineTo(editorCanvas.width, i * CELL_SIZE);
+    editorCtx.stroke();
   }
 }
 
 function drawCellHighlight(gridX: number, gridY: number) {
-  ctx.fillStyle = "rgba(255, 255, 255, 0.1)";
-  ctx.fillRect(gridX * CELL_SIZE, gridY * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+  editorCtx.fillStyle = "rgba(255, 255, 255, 0.1)";
+  editorCtx.fillRect(
+    gridX * CELL_SIZE,
+    gridY * CELL_SIZE,
+    CELL_SIZE,
+    CELL_SIZE,
+  );
 }
 
 function drawPlayer(gridX: number, gridY: number) {
   const size = 40;
   const offset = (CELL_SIZE - size) / 2;
-  
-  ctx.fillStyle = "#666";
-  ctx.fillRect(
+
+  editorCtx.fillStyle = "#666";
+  editorCtx.fillRect(
     gridX * CELL_SIZE + offset,
     gridY * CELL_SIZE + offset,
-    size, size
+    size,
+    size,
   );
-  
-  ctx.fillStyle = "#888";
-  ctx.fillRect(
+
+  editorCtx.fillStyle = "#888";
+  editorCtx.fillRect(
     gridX * CELL_SIZE + offset + 5,
     gridY * CELL_SIZE + offset + 5,
-    size - 10, size - 10
+    size - 10,
+    size - 10,
   );
 }
 
 function drawRedAttractor(gridX: number, gridY: number) {
   const pos = gridToPixel(gridX, gridY);
-  ctx.fillStyle = "#c44444";
-  ctx.fillRect(pos.x, pos.y, 35, 35);
-  ctx.fillStyle = "#ff6666";
-  ctx.fillRect(pos.x + 5, pos.y + 5, 25, 25);
+  editorCtx.fillStyle = "#c44444";
+  editorCtx.fillRect(pos.x, pos.y, 35, 35);
+  editorCtx.fillStyle = "#ff6666";
+  editorCtx.fillRect(pos.x + 5, pos.y + 5, 25, 25);
 }
 
 function drawBlueAttractor(gridX: number, gridY: number) {
   const pos = gridToPixel(gridX, gridY);
-  ctx.fillStyle = "#4444c4";
-  ctx.fillRect(pos.x, pos.y, 35, 35);
-  ctx.fillStyle = "#6666ff";
-  ctx.fillRect(pos.x + 5, pos.y + 5, 25, 25);
+  editorCtx.fillStyle = "#4444c4";
+  editorCtx.fillRect(pos.x, pos.y, 35, 35);
+  editorCtx.fillStyle = "#6666ff";
+  editorCtx.fillRect(pos.x + 5, pos.y + 5, 25, 25);
 }
 
 function drawTarget(gridX: number, gridY: number) {
   const pos = gridToPixel(gridX, gridY);
-  ctx.fillStyle = "#4CAF50";
-  ctx.fillRect(pos.x, pos.y, 35, 35);
-  ctx.fillStyle = "#66ff66";
-  ctx.fillRect(pos.x + 5, pos.y + 5, 25, 25);
+  editorCtx.fillStyle = "#4CAF50";
+  editorCtx.fillRect(pos.x, pos.y, 35, 35);
+  editorCtx.fillStyle = "#66ff66";
+  editorCtx.fillRect(pos.x + 5, pos.y + 5, 25, 25);
 }
 
 function drawWall(gridX: number, gridY: number) {
-  ctx.fillStyle = "#aaaaaa";
-  ctx.fillRect(gridX * CELL_SIZE, gridY * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-  ctx.fillStyle = "#cccccc";
-  ctx.fillRect(gridX * CELL_SIZE + 2, gridY * CELL_SIZE + 2, CELL_SIZE - 4, CELL_SIZE - 4);
+  editorCtx.fillStyle = "#aaaaaa";
+  editorCtx.fillRect(
+    gridX * CELL_SIZE,
+    gridY * CELL_SIZE,
+    CELL_SIZE,
+    CELL_SIZE,
+  );
+  editorCtx.fillStyle = "#cccccc";
+  editorCtx.fillRect(
+    gridX * CELL_SIZE + 2,
+    gridY * CELL_SIZE + 2,
+    CELL_SIZE - 4,
+    CELL_SIZE - 4,
+  );
 }
 
 function drawGridContents() {
@@ -461,8 +512,8 @@ let hoveredCell: { gridX: number; gridY: number } | null = null;
 
 function draw() {
   // Clear canvas
-  ctx.fillStyle = "#5a4a3a";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  editorCtx.fillStyle = "#5a4a3a";
+  editorCtx.fillRect(0, 0, editorCanvas.width, editorCanvas.height);
 
   // Draw grid
   drawGrid();
@@ -477,21 +528,21 @@ function draw() {
 }
 
 // Mouse handling
-canvas.addEventListener("mousemove", (e) => {
-  const rect = canvas.getBoundingClientRect();
+editorCanvas.addEventListener("mousemove", (e) => {
+  const rect = editorCanvas.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
   hoveredCell = pixelToGrid(x, y);
   draw();
 });
 
-canvas.addEventListener("mouseleave", () => {
+editorCanvas.addEventListener("mouseleave", () => {
   hoveredCell = null;
   draw();
 });
 
-canvas.addEventListener("click", (e) => {
-  const rect = canvas.getBoundingClientRect();
+editorCanvas.addEventListener("click", (e) => {
+  const rect = editorCanvas.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
   const gridPos = pixelToGrid(x, y);
@@ -499,18 +550,22 @@ canvas.addEventListener("click", (e) => {
 });
 
 // Tool selection
-document.querySelectorAll(".tool-btn").forEach(btn => {
+document.querySelectorAll(".tool-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
-    document.querySelectorAll(".tool-btn").forEach(b => b.classList.remove("active"));
+    document
+      .querySelectorAll(".tool-btn")
+      .forEach((b) => b.classList.remove("active"));
     btn.classList.add("active");
     currentTool = btn.getAttribute("data-tool") as Tool;
   });
 });
 
 // Stage selection
-document.querySelectorAll(".stage-btn").forEach(btn => {
+document.querySelectorAll(".stage-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
-    document.querySelectorAll(".stage-btn").forEach(b => b.classList.remove("active"));
+    document
+      .querySelectorAll(".stage-btn")
+      .forEach((b) => b.classList.remove("active"));
     btn.classList.add("active");
     const stageIndex = parseInt(btn.getAttribute("data-stage") || "0", 10);
     currentStageIndex = stageIndex;
@@ -530,7 +585,7 @@ document.getElementById("gameModeSelect")?.addEventListener("change", (e) => {
 
 // Update stage selector UI
 function updateStageSelector() {
-  document.querySelectorAll(".stage-btn").forEach(btn => {
+  document.querySelectorAll(".stage-btn").forEach((btn) => {
     const stageIndex = parseInt(btn.getAttribute("data-stage") || "0", 10);
     if (stageIndex === currentStageIndex) {
       btn.classList.add("active");
@@ -541,8 +596,16 @@ function updateStageSelector() {
 }
 
 // Count objects in base grid and current stage
-function countObjects(): { red: number; blue: number; targets: number; walls: number } {
-  let red = 0, blue = 0, targets = 0, walls = 0;
+function countObjects(): {
+  red: number;
+  blue: number;
+  targets: number;
+  walls: number;
+} {
+  let red = 0,
+    blue = 0,
+    targets = 0,
+    walls = 0;
 
   // Count from base grid (P, R, B, W)
   for (let y = 0; y < GRID_SIZE; y++) {
@@ -582,15 +645,16 @@ function renderLevelList() {
 
   levels.forEach((level, index) => {
     const item = document.createElement("div");
-    item.className = "level-item" + (level.name === currentLevel.name ? " active" : "");
-    
+    item.className =
+      "level-item" + (level.name === currentLevel.name ? " active" : "");
+
     const nameSpan = document.createElement("span");
     nameSpan.className = "level-item-name";
     nameSpan.textContent = level.name;
-    
+
     const actions = document.createElement("div");
     actions.className = "level-item-actions";
-    
+
     const renameBtn = document.createElement("button");
     renameBtn.className = "icon-btn";
     renameBtn.innerHTML = "✎";
@@ -608,7 +672,7 @@ function renderLevelList() {
         updateStats();
       }
     };
-    
+
     const deleteBtn = document.createElement("button");
     deleteBtn.className = "icon-btn";
     deleteBtn.innerHTML = "🗑";
@@ -629,17 +693,17 @@ function renderLevelList() {
         updateStats();
       }
     };
-    
+
     actions.appendChild(renameBtn);
     actions.appendChild(deleteBtn);
-    
+
     item.appendChild(nameSpan);
     item.appendChild(actions);
-    
+
     item.onclick = () => {
       loadLevel(level);
     };
-    
+
     listEl.appendChild(item);
   });
 }
@@ -686,8 +750,8 @@ document.getElementById("saveBtn")!.addEventListener("click", () => {
     alert("Cannot save: " + validation.error);
     return;
   }
-  
-  const existingIndex = levels.findIndex(l => l.name === currentLevel.name);
+
+  const existingIndex = levels.findIndex((l) => l.name === currentLevel.name);
   if (existingIndex !== -1) {
     levels[existingIndex] = JSON.parse(JSON.stringify(currentLevel));
   } else {
@@ -695,7 +759,7 @@ document.getElementById("saveBtn")!.addEventListener("click", () => {
   }
   saveLevelsToStorage();
   renderLevelList();
-  
+
   // Increment the name for the next level
   currentLevel.name = incrementLevelName(currentLevel.name);
   // Clear the base grid for the new level (keep player)
@@ -714,7 +778,7 @@ document.getElementById("saveBtn")!.addEventListener("click", () => {
     currentLevel.stages.push({ targets: [] });
   }
   currentStageIndex = 0;
-  
+
   updateStats();
   updateValidationUI();
   draw();
@@ -724,14 +788,16 @@ document.getElementById("saveBtn")!.addEventListener("click", () => {
 // Export to JSON (new compact format)
 document.getElementById("exportBtn")!.addEventListener("click", () => {
   const data = {
-    levels: [currentLevel]
+    levels: [currentLevel],
   };
   const json = JSON.stringify(data, null, 2);
   const blob = new Blob([json], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `${currentLevel.name.replace(/[^a-z0-9]/gi, "_").toLowerCase()}.json`;
+  a.download = `${currentLevel.name
+    .replace(/[^a-z0-9]/gi, "_")
+    .toLowerCase()}.json`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -781,7 +847,7 @@ document.getElementById("importBtn")!.addEventListener("change", (e) => {
 
         if (importedLevels.length > 0 && importedLevels[0]) {
           // Add all imported levels
-          importedLevels.forEach(level => levels.push(level));
+          importedLevels.forEach((level) => levels.push(level));
           saveLevelsToStorage();
           loadLevel(importedLevels[0]);
           alert(`Imported ${importedLevels.length} level(s)!`);
@@ -847,7 +913,10 @@ function convertOldFormatToNew(oldLevel: any): Level {
   }
 
   // Place player
-  if (oldLevel.playerGridX !== undefined && oldLevel.playerGridY !== undefined) {
+  if (
+    oldLevel.playerGridX !== undefined &&
+    oldLevel.playerGridY !== undefined
+  ) {
     const playerRow = baseGrid[oldLevel.playerGridY];
     if (playerRow) {
       playerRow[oldLevel.playerGridX] = "P";
@@ -893,7 +962,10 @@ function convertOldFormatToNew(oldLevel: any): Level {
   // Create stages from targets
   const stages: Stage[] = [];
   if (oldLevel.targets && Array.isArray(oldLevel.targets)) {
-    const targets = oldLevel.targets.map((t: any) => ({ x: t.gridX, y: t.gridY }));
+    const targets = oldLevel.targets.map((t: any) => ({
+      x: t.gridX,
+      y: t.gridY,
+    }));
     stages.push({ targets });
   } else {
     stages.push({ targets: [] });
@@ -915,7 +987,7 @@ function convertOldFormatToNew(oldLevel: any): Level {
 // Test in game
 document.getElementById("testBtn")!.addEventListener("click", () => {
   const data = {
-    level: currentLevel
+    level: currentLevel,
   };
   const json = JSON.stringify(data);
   const encoded = encodeURIComponent(json);
@@ -938,7 +1010,7 @@ function loadLevelsFromStorage() {
       levels = [];
     }
   }
-  
+
   if (levels.length === 0) {
     // Create a default level
     const defaultLevel = createEmptyLevel("Level 1");
@@ -954,7 +1026,7 @@ function loadLevelsFromStorage() {
     levels.push(defaultLevel);
     saveLevelsToStorage();
   }
-  
+
   if (levels.length > 0 && levels[0]) {
     loadLevel(levels[0]);
   }

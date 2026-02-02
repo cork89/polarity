@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Level Editor - Polarity</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: #2a2a2a;
+        color: #fff;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .header {
+        background: #1a1a1a;
+        padding: 15px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 2px solid #444;
+      }
+
+      .header h1 {
+        font-size: 24px;
+        color: #fff;
+      }
+
+      .header-buttons {
+        display: flex;
+        gap: 10px;
+      }
+
+      .main-container {
+        display: flex;
+        flex: 1;
+        padding: 20px;
+        gap: 20px;
+      }
+
+      .tools-panel {
+        background: #333;
+        border-radius: 8px;
+        padding: 20px;
+        width: 200px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .tools-panel h3 {
+        margin-bottom: 10px;
+        color: #aaa;
+        font-size: 14px;
+        text-transform: uppercase;
+      }
+
+      .tool-btn {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px;
+        background: #444;
+        border: 2px solid transparent;
+        border-radius: 6px;
+        color: #fff;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .tool-btn:hover {
+        background: #555;
+      }
+
+      .tool-btn.active {
+        background: #555;
+        border-color: #6666ff;
+      }
+
+      .tool-icon {
+        width: 30px;
+        height: 30px;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        font-weight: bold;
+      }
+
+      .tool-player {
+        background: #666;
+      }
+      .tool-red {
+        background: #c44444;
+      }
+      .tool-blue {
+        background: #4444c4;
+      }
+      .tool-green {
+        background: #4caf50;
+      }
+      .tool-wall {
+        background: #aaaaaa;
+      }
+      .tool-eraser {
+        background: #888;
+      }
+
+      .canvas-container {
+        flex: 1;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        background: #252525;
+        border-radius: 8px;
+        padding: 20px;
+        position: relative;
+      }
+
+      #editorCanvas {
+        border: 2px solid #555;
+        background: #5a4a3a;
+        cursor: crosshair;
+      }
+
+      .validation-message {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(196, 68, 68, 0.9);
+        color: white;
+        padding: 10px 20px;
+        border-radius: 6px;
+        font-weight: bold;
+        font-size: 14px;
+        pointer-events: none;
+        display: none;
+        z-index: 10;
+      }
+
+      .validation-message.visible {
+        display: block;
+      }
+
+      .levels-panel {
+        background: #333;
+        border-radius: 8px;
+        padding: 20px;
+        width: 300px;
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+      }
+
+      .levels-panel h3 {
+        color: #aaa;
+        font-size: 14px;
+        text-transform: uppercase;
+        margin-bottom: 5px;
+      }
+
+      .level-list {
+        background: #2a2a2a;
+        border-radius: 6px;
+        max-height: 250px;
+        overflow-y: auto;
+        border: 1px solid #444;
+      }
+
+      .level-item {
+        padding: 12px 15px;
+        border-bottom: 1px solid #3a3a3a;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: background 0.2s;
+      }
+
+      .level-item:last-child {
+        border-bottom: none;
+      }
+
+      .level-item:hover {
+        background: #3a3a3a;
+      }
+
+      .level-item.active {
+        background: #4444c4;
+      }
+
+      .level-item-name {
+        font-weight: 500;
+      }
+
+      .level-item-actions {
+        display: flex;
+        gap: 5px;
+        opacity: 0;
+        transition: opacity 0.2s;
+      }
+
+      .level-item:hover .level-item-actions {
+        opacity: 1;
+      }
+
+      .icon-btn {
+        background: transparent;
+        border: none;
+        color: #aaa;
+        cursor: pointer;
+        font-size: 16px;
+        padding: 2px 5px;
+      }
+
+      .icon-btn:hover {
+        color: #fff;
+      }
+
+      .btn {
+        padding: 10px 15px;
+        background: #4444c4;
+        border: none;
+        border-radius: 6px;
+        color: #fff;
+        cursor: pointer;
+        font-size: 14px;
+        transition: background 0.2s;
+      }
+
+      .btn:hover {
+        background: #5555d5;
+      }
+
+      .btn-secondary {
+        background: #555;
+      }
+
+      .btn-secondary:hover {
+        background: #666;
+      }
+
+      .btn-success {
+        background: #4caf50;
+      }
+
+      .btn-success:hover {
+        background: #5cbf60;
+      }
+
+      .level-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .level-info {
+        background: #2a2a2a;
+        border-radius: 6px;
+        padding: 15px;
+        border: 1px solid #444;
+      }
+
+      .level-info-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 8px;
+        font-size: 14px;
+      }
+
+      .level-info-row:last-child {
+        margin-bottom: 0;
+      }
+
+      .level-info-label {
+        color: #888;
+      }
+
+      .level-info-value {
+        color: #fff;
+        font-weight: 500;
+      }
+
+      .import-export {
+        display: flex;
+        gap: 10px;
+      }
+
+      .import-export input[type="file"] {
+        display: none;
+      }
+
+      .legend {
+        background: #2a2a2a;
+        border-radius: 6px;
+        padding: 15px;
+        border: 1px solid #444;
+        font-size: 13px;
+      }
+
+      .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 8px;
+      }
+
+      .legend-item:last-child {
+        margin-bottom: 0;
+      }
+
+      .legend-color {
+        width: 20px;
+        height: 20px;
+        border-radius: 3px;
+      }
+
+      .legend-player {
+        background: #666;
+      }
+      .legend-red {
+        background: #c44444;
+      }
+      .legend-blue {
+        background: #4444c4;
+      }
+      .legend-green {
+        background: #4caf50;
+      }
+      .legend-wall {
+        background: #aaaaaa;
+      }
+
+      .stage-selector {
+        display: flex;
+        gap: 5px;
+        background: #2a2a2a;
+        border-radius: 6px;
+        padding: 10px;
+        border: 1px solid #444;
+      }
+
+      .stage-btn {
+        flex: 1;
+        padding: 8px 10px;
+        background: #444;
+        border: 2px solid transparent;
+        border-radius: 4px;
+        color: #fff;
+        cursor: pointer;
+        font-size: 13px;
+        transition: all 0.2s;
+      }
+
+      .stage-btn:hover {
+        background: #555;
+      }
+
+      .stage-btn.active {
+        background: #4caf50;
+        border-color: #66ff66;
+      }
+
+      .game-mode-select {
+        width: 100%;
+        padding: 8px 12px;
+        font-size: 14px;
+        background: #444;
+        color: #fff;
+        border: 2px solid #555;
+        border-radius: 4px;
+        cursor: pointer;
+        margin-bottom: 10px;
+      }
+
+      .game-mode-select:hover {
+        background: #555;
+      }
+
+      .game-mode-select option {
+        background: #444;
+        color: #fff;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>Polarity Level Editor</h1>
+      <div class="header-buttons">
+        <button class="btn btn-success" id="testBtn">Test in Game</button>
+        <button class="btn" onclick="location.href='index.html'">
+          Back to Game
+        </button>
+      </div>
+    </div>
+
+    <div class="main-container">
+      <div class="tools-panel">
+        <h3>Tools</h3>
+
+        <button class="tool-btn active" data-tool="player">
+          <div class="tool-icon tool-player">P</div>
+          <span>Player Start</span>
+        </button>
+
+        <button class="tool-btn" data-tool="red">
+          <div class="tool-icon tool-red">R</div>
+          <span>Red Magnet</span>
+        </button>
+
+        <button class="tool-btn" data-tool="blue">
+          <div class="tool-icon tool-blue">B</div>
+          <span>Blue Magnet</span>
+        </button>
+
+        <button class="tool-btn" data-tool="target">
+          <div class="tool-icon tool-green">G</div>
+          <span>Target</span>
+        </button>
+
+        <button class="tool-btn" data-tool="wall">
+          <div class="tool-icon tool-wall">W</div>
+          <span>Wall</span>
+        </button>
+
+        <button class="tool-btn" data-tool="eraser">
+          <div class="tool-icon tool-eraser">✕</div>
+          <span>Eraser</span>
+        </button>
+
+        <div class="legend" style="margin-top: auto">
+          <div class="legend-item">
+            <div class="legend-color legend-player"></div>
+            <span>Player spawn</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color legend-red"></div>
+            <span>Press X to attract</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color legend-blue"></div>
+            <span>Press Z to attract</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color legend-green"></div>
+            <span>Collect for points</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color legend-wall"></div>
+            <span>Impassable barrier</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="canvas-container">
+        <canvas id="editorCanvas" width="600" height="600"></canvas>
+        <div class="validation-message" id="validationMessage">
+          Target unreachable
+        </div>
+      </div>
+
+      <div class="levels-panel">
+        <h3>Levels</h3>
+
+        <div class="level-actions">
+          <button class="btn btn-success" id="newLevelBtn">New Level</button>
+          <button class="btn btn-secondary" id="saveBtn">Save</button>
+        </div>
+
+        <div class="level-list" id="levelList">
+          <!-- Level items will be inserted here -->
+        </div>
+
+        <h3>Game Mode</h3>
+        <select
+          class="level-select"
+          id="gameModeSelect"
+          style="
+            width: 100%;
+            padding: 8px;
+            font-size: 14px;
+            background: #444;
+            color: #fff;
+            border: 2px solid #555;
+            border-radius: 4px;
+            cursor: pointer;
+          "
+        >
+          <option value="staged">Staged (3 stages with targets)</option>
+          <option value="timeAttack">Time Attack (30s, auto targets)</option>
+          <option value="sprint">Sprint (250 pts, auto targets)</option>
+        </select>
+
+        <h3>Stages</h3>
+        <div class="stage-selector">
+          <button class="stage-btn active" data-stage="0">Stage 1</button>
+          <button class="stage-btn" data-stage="1">Stage 2</button>
+          <button class="stage-btn" data-stage="2">Stage 3</button>
+        </div>
+
+        <div class="level-info">
+          <div class="level-info-row">
+            <span class="level-info-label">Current Level:</span>
+            <span class="level-info-value" id="currentLevelName">Untitled</span>
+          </div>
+          <div class="level-info-row">
+            <span class="level-info-label">Red Magnets:</span>
+            <span class="level-info-value" id="redCount">0</span>
+          </div>
+          <div class="level-info-row">
+            <span class="level-info-label">Blue Magnets:</span>
+            <span class="level-info-value" id="blueCount">0</span>
+          </div>
+          <div class="level-info-row">
+            <span class="level-info-label">Targets:</span>
+            <span class="level-info-value" id="targetCount">0</span>
+          </div>
+          <div class="level-info-row">
+            <span class="level-info-label">Walls:</span>
+            <span class="level-info-value" id="wallCount">0</span>
+          </div>
+        </div>
+
+        <div class="import-export">
+          <button class="btn btn-secondary" id="exportBtn">Export JSON</button>
+          <label class="btn btn-secondary" style="cursor: pointer">
+            Import JSON
+            <input type="file" id="importBtn" accept=".json" />
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="editor.ts"></script>
+  </body>
+</html>

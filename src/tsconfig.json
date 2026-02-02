@@ -1,0 +1,17 @@
+{
+  "extends": "../../tools/tsconfig-base.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "dom"],
+    "types": ["node", "bun"],
+    "rootDir": ".",
+    "outDir": "../../dist/server",
+    "tsBuildInfoFile": "../../dist/types/server/tsconfig.",
+    "noEmit": false,
+    "jsx": "react-jsx",
+    "jsxImportSource": "hono/jsx",
+  },
+  // https://github.com/Microsoft/TypeScript/issues/25636
+  "include": ["**/*", "**/*.json", "../../package.json"],
+  "exclude": ["**/*.test.ts"],
+  "references": []
+}
