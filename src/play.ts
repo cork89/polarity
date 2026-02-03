@@ -75,7 +75,7 @@ const GRAVITY = 0.0625;
 
 // Physics speed multiplier - INCREASE this if game is too slow, DECREASE if too fast
 // 1.0 = original speed, 2.0 = twice as fast, 0.5 = half speed
-const PHYSICS_SPEED = 1.0;
+const PHYSICS_SPEED = 2.0;
 
 // Game modes
 type GameMode = "timeAttack" | "sprint" | "staged";
@@ -189,6 +189,9 @@ interface Player {
   size: number;
   trail: TrailPoint[];
   hasAttracted: boolean;
+  // Previous position for interpolation (smooths high refresh rate displays)
+  prevX: number;
+  prevY: number;
 }
 
 class TrailPointPool {
@@ -286,6 +289,8 @@ const player: Player = {
   size: PLAYER_SIZE,
   trail: [],
   hasAttracted: false,
+  prevX: gameCanvas.width / 2 - PLAYER_SIZE / 2,
+  prevY: gameCanvas.height / 2 - PLAYER_SIZE / 2,
 };
 
 // Attractors
@@ -838,15 +843,22 @@ setupArcadeButton(btnZ, "z");
 setupArcadeButton(btnX, "x");
 
 // Sync button visual state with keys object (called every frame)
+// Track previous button states to avoid unnecessary DOM updates
+let lastZActive = false;
+let lastXActive = false;
+
 function syncButtonVisuals() {
-  if (btnZ) {
+  // Only update DOM if state actually changed (reduces iOS jitter)
+  if (btnZ && keys.z !== lastZActive) {
+    lastZActive = keys.z;
     if (keys.z) {
       btnZ.classList.add("active");
     } else {
       btnZ.classList.remove("active");
     }
   }
-  if (btnX) {
+  if (btnX && keys.x !== lastXActive) {
+    lastXActive = keys.x;
     if (keys.x) {
       btnX.classList.add("active");
     } else {
@@ -937,6 +949,10 @@ function applyAttraction() {
 }
 
 function updatePlayer() {
+  // Store previous position for interpolation (smooths high refresh rate displays)
+  player.prevX = player.x;
+  player.prevY = player.y;
+
   // Apply gravity only after first attraction and when not currently attracting
   const isAttracting = keys.x || keys.z;
   if (isAttracting) {
@@ -1268,7 +1284,14 @@ function drawWalls() {
   });
 }
 
-function drawPlayer() {
+function drawPlayer(interpolationFactor: number = 0) {
+  // Calculate interpolated position for smooth rendering at high refresh rates
+  // interpolationFactor is 0.0 to 1.0 representing how far between physics steps
+  const renderX =
+    player.prevX + (player.x - player.prevX) * interpolationFactor;
+  const renderY =
+    player.prevY + (player.y - player.prevY) * interpolationFactor;
+
   // Draw trail - narrower to avoid showing through transparent sides of penguin image
   const trailWidth = player.size * TRAIL_WIDTH_RATIO;
   const trailOffsetX = (player.size - trailWidth) / 2;
@@ -1288,7 +1311,7 @@ function drawPlayer() {
     // Save context, translate to center, rotate, draw, restore
     // Hitbox remains unchanged - only visual rotation
     gameCtx.save();
-    gameCtx.translate(player.x + player.size / 2, player.y + player.size / 2);
+    gameCtx.translate(renderX + player.size / 2, renderY + player.size / 2);
     gameCtx.rotate(tilt);
     gameCtx.drawImage(
       playerImage,
@@ -1301,11 +1324,11 @@ function drawPlayer() {
   } else {
     // Fallback to rectangle drawing
     gameCtx.fillStyle = COLOR_PLAYER_OUTER;
-    gameCtx.fillRect(player.x, player.y, player.size, player.size);
+    gameCtx.fillRect(renderX, renderY, player.size, player.size);
     gameCtx.fillStyle = COLOR_PLAYER_INNER;
     gameCtx.fillRect(
-      player.x + ATTRACTOR_DETAIL_INSET,
-      player.y + ATTRACTOR_DETAIL_INSET,
+      renderX + ATTRACTOR_DETAIL_INSET,
+      renderY + ATTRACTOR_DETAIL_INSET,
       player.size - ATTRACTOR_DETAIL_INSET * 2,
       player.size - ATTRACTOR_DETAIL_INSET * 2,
     );
@@ -1329,7 +1352,10 @@ function drawAttractionLines() {
       gameCtx.lineWidth = 2;
       gameCtx.beginPath();
       gameCtx.moveTo(player.x + player.size / 2, player.y + player.size / 2);
-      gameCtx.lineTo(closestRed.x + ATTRACTOR_SIZE / 2, closestRed.y + ATTRACTOR_SIZE / 2);
+      gameCtx.lineTo(
+        closestRed.x + ATTRACTOR_SIZE / 2,
+        closestRed.y + ATTRACTOR_SIZE / 2,
+      );
       gameCtx.stroke();
     }
   }
@@ -1340,7 +1366,10 @@ function drawAttractionLines() {
       gameCtx.lineWidth = 2;
       gameCtx.beginPath();
       gameCtx.moveTo(player.x + player.size / 2, player.y + player.size / 2);
-      gameCtx.lineTo(closestBlue.x + ATTRACTOR_SIZE / 2, closestBlue.y + ATTRACTOR_SIZE / 2);
+      gameCtx.lineTo(
+        closestBlue.x + ATTRACTOR_SIZE / 2,
+        closestBlue.y + ATTRACTOR_SIZE / 2,
+      );
       gameCtx.stroke();
     }
   }
@@ -1417,8 +1446,47 @@ function restartGame() {
   updateScoreFont(0);
 }
 
+// Frame-rate independent physics tracking
+let lastFrameTime = performance.now();
+let physicsAccumulatedTime = 0;
+const PHYSICS_DT = 1000 / 60; // Physics runs at 60Hz = 16.67ms per step
+const MAX_PHYSICS_STEPS = 5; // Prevent spiral of death if tab was inactive
+
+// Debug counter for logging
+let debugFrameCounter = 0;
+
 // Main game loop
 function gameLoop() {
+  // Calculate how many physics steps to run based on elapsed time
+  const currentTime = performance.now();
+  const elapsed = currentTime - lastFrameTime;
+  lastFrameTime = currentTime;
+
+  // Accumulate time and calculate physics steps
+  // At 60fps: 1 step/frame, At 30fps: 2 steps every 2nd frame, At 165fps: 1 step every ~2.75 frames
+  physicsAccumulatedTime += elapsed;
+  let physicsSteps = 0;
+
+  while (
+    physicsAccumulatedTime >= PHYSICS_DT &&
+    physicsSteps < MAX_PHYSICS_STEPS
+  ) {
+    physicsSteps++;
+    physicsAccumulatedTime -= PHYSICS_DT;
+  }
+
+  // DEBUG: Log physics timing every 60 frames
+  debugFrameCounter++;
+  if (debugFrameCounter % 60 === 0) {
+    console.log(
+      `FPS: ${(1000 / elapsed).toFixed(
+        0,
+      )}, steps: ${physicsSteps}, accum: ${physicsAccumulatedTime.toFixed(
+        2,
+      )}ms`,
+    );
+  }
+
   // Sync button visuals with key state (handles iOS touch desync issues)
   syncButtonVisuals();
 
@@ -1495,7 +1563,7 @@ function gameLoop() {
     drawAttractors();
     drawTargets(Date.now());
     drawParticles();
-    drawPlayer();
+    drawPlayer(0); // No interpolation needed when game is over
     // Show game over overlay
     drawGameOver();
   } else {
@@ -1504,11 +1572,19 @@ function gameLoop() {
     // Update timer
     updateTimer();
 
-    // Run physics once per frame (speed controlled by PHYSICS_SPEED constant)
-    applyAttraction();
-    updatePlayer();
-    checkCollisions();
+    // Run physics multiple times to maintain consistent speed across frame rates
+    // At 60fps: 1 step per frame, At 30fps: 2 steps per frame
+    for (let i = 0; i < physicsSteps; i++) {
+      applyAttraction();
+      updatePlayer();
+      checkCollisions();
+    }
+    // Particles don't affect gameplay, update once per render frame
     updateParticles();
+
+    // Calculate interpolation factor for smooth rendering (0.0 to 1.0)
+    // Shows how far we are between physics steps
+    const interpolationFactor = physicsAccumulatedTime / PHYSICS_DT;
 
     // Draw everything
     drawWalls();
@@ -1516,7 +1592,7 @@ function gameLoop() {
     drawAttractors();
     drawTargets(Date.now());
     drawParticles();
-    drawPlayer();
+    drawPlayer(interpolationFactor);
   }
 
   requestAnimationFrame(gameLoop);

@@ -59,12 +59,21 @@
         justify-content: center;
         min-height: 100vh;
         font-family: "Orbitron", monospace;
+        /* iOS optimizations */
+        -webkit-overflow-scrolling: auto;
+        overscroll-behavior: none;
+        touch-action: none;
       }
       canvas {
         border: 2px solid var(--border-color);
         background: var(--canvas-bg);
         box-shadow: 0 0 20px var(--neon-cyan-glow),
           inset 0 0 30px rgba(0, 212, 255, 0.05);
+        /* iOS optimizations for smooth rendering */
+        -webkit-transform: translateZ(0);
+        transform: translateZ(0);
+        will-change: transform;
+        touch-action: none;
       }
       .instructions {
         color: var(--text-color);
