@@ -3,8 +3,26 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Level Editor - Polarity</title>
+    <title>LEVEL EDITOR - POLARITY</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400..900&display=swap"
+      rel="stylesheet"
+    />
     <style>
+      :root {
+        --bg-color: #0a0a0f;
+        --text-color: #e0e0ff;
+        --border-color: #00d4ff;
+        --neon-cyan: #00d4ff;
+        --neon-cyan-glow: rgba(0, 212, 255, 0.6);
+        --neon-orange: #ff6b35;
+        --neon-orange-glow: rgba(255, 107, 53, 0.6);
+        --panel-bg: #1a1a2e;
+        --panel-bg-light: #252542;
+      }
+
       * {
         box-sizing: border-box;
         margin: 0;
@@ -12,10 +30,9 @@
       }
 
       body {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-          Helvetica, Arial, sans-serif;
-        background: #2a2a2a;
-        color: #fff;
+        font-family: "Orbitron", -apple-system, BlinkMacSystemFont, sans-serif;
+        background: var(--bg-color);
+        color: var(--text-color);
         min-height: 100vh;
         display: flex;
         flex-direction: column;
@@ -24,12 +41,13 @@
 
       /* Header */
       .header {
-        background: #1a1a1a;
-        padding: 10px 15px;
+        background: var(--panel-bg);
+        padding: 10px 5px;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        border-bottom: 2px solid #444;
+        border-bottom: 2px solid var(--border-color);
+        box-shadow: 0 0 15px rgba(0, 212, 255, 0.3);
         flex-shrink: 0;
       }
 
@@ -54,11 +72,14 @@
         display: flex;
         justify-content: center;
         align-items: center;
-        background: #252525;
+        background: var(--panel-bg);
+        border: 2px solid var(--border-color);
         border-radius: 8px;
         padding: 10px;
         position: relative;
         flex-shrink: 0;
+        box-shadow: 0 0 20px rgba(0, 212, 255, 0.2),
+          inset 0 0 30px rgba(0, 212, 255, 0.05);
       }
 
       #editorCanvas {
@@ -66,10 +87,12 @@
         background: #5a4a3a;
         cursor: crosshair;
         display: block;
+        box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
       }
 
       #editorCanvas.invalid {
-        border: 4px solid #c44444;
+        border: 4px solid var(--neon-orange);
+        box-shadow: 0 0 15px var(--neon-orange-glow);
         border-radius: 4px;
       }
 
@@ -78,7 +101,7 @@
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
-        background: rgba(196, 68, 68, 0.95);
+        background: rgba(255, 107, 53, 0.95);
         color: white;
         padding: 10px 16px;
         border-radius: 6px;
@@ -88,6 +111,10 @@
         display: none;
         z-index: 10;
         white-space: nowrap;
+        box-shadow: 0 0 20px var(--neon-orange-glow);
+        border: 2px solid var(--neon-orange);
+        font-family: "Orbitron", sans-serif;
+        text-shadow: 0 0 5px var(--neon-orange-glow);
       }
 
       .validation-message.visible {
@@ -98,43 +125,51 @@
       .stage-selector {
         display: flex;
         gap: 5px;
-        background: #333;
+        background: var(--panel-bg);
+        border: 1px solid var(--border-color);
         border-radius: 8px;
         padding: 8px;
         margin: 10px 10px 0 10px;
         flex-shrink: 0;
+        box-shadow: 0 0 10px rgba(0, 212, 255, 0.15);
       }
 
       .stage-btn {
         flex: 1;
         padding: 8px 6px;
-        background: #444;
+        background: var(--panel-bg-light);
         border: 2px solid transparent;
         border-radius: 6px;
-        color: #fff;
+        color: var(--text-color);
         cursor: pointer;
         font-size: 12px;
         font-weight: 500;
+        font-family: "Orbitron", sans-serif;
         transition: all 0.2s;
         min-width: 60px;
       }
 
       .stage-btn:hover {
-        background: #555;
+        background: rgba(0, 212, 255, 0.2);
+        border-color: var(--neon-cyan);
+        box-shadow: 0 0 10px var(--neon-cyan-glow);
       }
 
       .stage-btn.active {
-        background: #4caf50;
-        border-color: #66ff66;
+        background: rgba(76, 175, 80, 0.3);
+        border-color: #4caf50;
+        box-shadow: 0 0 15px rgba(76, 175, 80, 0.5);
       }
 
       /* Toolbar */
       .toolbar-container {
-        background: #333;
+        background: var(--panel-bg);
+        border: 1px solid var(--border-color);
         border-radius: 8px;
         padding: 8px;
         flex-shrink: 0;
         position: relative;
+        box-shadow: 0 0 10px rgba(0, 212, 255, 0.15);
       }
 
       .toolbar-container::after {
@@ -144,7 +179,7 @@
         top: 8px;
         bottom: 8px;
         width: 30px;
-        background: linear-gradient(to right, transparent, #333);
+        background: linear-gradient(to right, transparent, var(--panel-bg));
         pointer-events: none;
         border-radius: 0 8px 8px 0;
         opacity: 0;
@@ -161,7 +196,7 @@
         overflow-x: auto;
         padding: 4px;
         scrollbar-width: thin;
-        scrollbar-color: #555 #333;
+        scrollbar-color: var(--border-color) var(--panel-bg);
       }
 
       .toolbar::-webkit-scrollbar {
@@ -169,17 +204,17 @@
       }
 
       .toolbar::-webkit-scrollbar-track {
-        background: #333;
+        background: var(--panel-bg);
         border-radius: 3px;
       }
 
       .toolbar::-webkit-scrollbar-thumb {
-        background: #555;
+        background: rgba(0, 212, 255, 0.4);
         border-radius: 3px;
       }
 
       .toolbar::-webkit-scrollbar-thumb:hover {
-        background: #666;
+        background: rgba(0, 212, 255, 0.6);
       }
 
       .tool-btn {
@@ -189,24 +224,28 @@
         justify-content: center;
         gap: 4px;
         padding: 8px 12px;
-        background: #444;
-        border: 3px solid transparent;
+        background: var(--panel-bg-light);
+        border: 2px solid transparent;
         border-radius: 8px;
-        color: #fff;
+        color: var(--text-color);
         cursor: pointer;
         transition: all 0.2s;
         min-width: 60px;
         min-height: 60px;
         flex-shrink: 0;
+        font-family: "Orbitron", sans-serif;
       }
 
       .tool-btn:hover {
-        background: #555;
+        background: rgba(0, 212, 255, 0.2);
+        border-color: var(--neon-cyan);
+        box-shadow: 0 0 10px var(--neon-cyan-glow);
       }
 
       .tool-btn.active {
-        background: #555;
-        border-color: #6666ff;
+        background: rgba(0, 212, 255, 0.25);
+        border-color: var(--neon-cyan);
+        box-shadow: 0 0 15px var(--neon-cyan-glow);
       }
 
       .tool-icon {
@@ -218,25 +257,31 @@
         justify-content: center;
         font-size: 16px;
         font-weight: bold;
+        box-shadow: 0 0 8px rgba(0, 0, 0, 0.5);
       }
 
       .tool-label {
         font-size: 10px;
         text-transform: uppercase;
         letter-spacing: 0.5px;
+        font-weight: 600;
       }
 
       .tool-player .tool-icon {
         background: #666;
+        box-shadow: 0 0 8px rgba(102, 102, 102, 0.6);
       }
       .tool-red .tool-icon {
         background: #c44444;
+        box-shadow: 0 0 8px rgba(196, 68, 68, 0.6);
       }
       .tool-blue .tool-icon {
         background: #4444c4;
+        box-shadow: 0 0 8px rgba(68, 68, 196, 0.6);
       }
       .tool-target .tool-icon {
         background: #4caf50;
+        box-shadow: 0 0 8px rgba(76, 175, 80, 0.6);
       }
       .tool-wall .tool-icon {
         background: #aaaaaa;
@@ -248,110 +293,125 @@
 
       .btn {
         padding: 10px 14px;
-        background: #4444c4;
-        border: none;
+        background: rgba(0, 212, 255, 0.15);
+        border: 1px solid white;
         border-radius: 6px;
-        color: #fff;
+        color: white;
         cursor: pointer;
         font-size: 13px;
         font-weight: 500;
-        transition: background 0.2s;
+        font-family: "Orbitron", sans-serif;
+        transition: all 0.2s;
         flex: 1;
+        /* box-shadow: 0 0 10px var(--neon-cyan-glow); */
       }
 
       .btn:hover {
-        background: #5555d5;
+        background: rgba(0, 212, 255, 0.3);
+        box-shadow: 0 0 15px var(--neon-cyan);
       }
 
       .btn-secondary {
-        background: #555;
+        background: rgba(128, 128, 128, 0.15);
+        border-color: #888;
+        color: #ccc;
+        box-shadow: 0 0 8px rgba(128, 128, 128, 0.3);
       }
 
       .btn-secondary:hover {
-        background: #666;
+        background: rgba(128, 128, 128, 0.3);
+        box-shadow: 0 0 12px rgba(128, 128, 128, 0.5);
       }
 
       .btn-success {
-        background: #4caf50;
+        background: rgba(76, 175, 80, 0.15);
+        border-color: #4caf50;
+        color: white;
+        /* box-shadow: 0 0 10px rgba(76, 175, 80, 0.5); */
       }
 
       .btn-success:hover {
-        background: #5cbf60;
+        background: rgba(76, 175, 80, 0.3);
+        box-shadow: 0 0 15px rgba(76, 175, 80, 0.7);
       }
 
       .btn:disabled {
-        background: #555;
+        background: rgba(128, 128, 128, 0.1);
+        border-color: #555;
+        color: #666;
         opacity: 0.5;
         cursor: not-allowed;
+        box-shadow: none;
+      }
+
+      /* Base select styling with new customizable select API */
+      .game-mode-select,
+      ::picker(select) {
+        appearance: base-select;
       }
 
       .game-mode-select {
         flex: 1;
+        font-family: "Orbitron", sans-serif;
+      }
+
+      /* Style the trigger button */
+      .game-mode-select button {
+        width: 100%;
         padding: 10px 12px;
         font-size: 13px;
-        background: #444;
-        color: #fff;
-        border: 2px solid #555;
+        background-color: var(--panel-bg-light);
+        color: var(--text-color);
+        border: 2px solid var(--neon-cyan);
         border-radius: 6px;
         cursor: pointer;
-      }
-
-      .game-mode-select:hover {
-        background: #555;
-      }
-
-      /* Popover Styles */
-      #levelsPopover {
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        max-height: 70vh;
-        background: #2a2a2a;
-        border-radius: 16px 16px 0 0;
-        padding: 20px;
-        margin: 0;
-        border: none;
-        box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
-        overflow-y: auto;
-      }
-
-      #levelsPopover::backdrop {
-        background: rgba(0, 0, 0, 0.7);
-      }
-
-      .popover-header {
+        box-shadow: 0 0 10px var(--neon-cyan-glow);
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 15px;
-        padding-bottom: 10px;
-        border-bottom: 2px solid #444;
       }
 
-      .popover-header h3 {
-        font-size: 18px;
-        color: #fff;
+      .game-mode-select button:hover {
+        background-color: rgba(0, 212, 255, 0.2);
+        box-shadow: 0 0 15px var(--neon-cyan-glow);
       }
 
-      .close-btn {
-        background: none;
-        border: none;
-        color: #aaa;
-        font-size: 24px;
+      /* Style the dropdown picker */
+      .game-mode-select::picker(select) {
+        background-color: var(--panel-bg);
+        border: 2px solid var(--neon-cyan);
+        border-radius: 6px;
+        box-shadow: 0 0 20px var(--neon-cyan-glow);
+      }
+
+      /* Style the options */
+      .game-mode-select option {
+        padding: 10px 12px;
+        font-family: "Orbitron", sans-serif;
+        font-size: 13px;
+        color: var(--text-color);
+        background-color: var(--panel-bg);
         cursor: pointer;
-        padding: 0;
-        width: 32px;
-        height: 32px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 50%;
       }
 
-      .close-btn:hover {
-        background: #444;
-        color: #fff;
+      .game-mode-select option:hover {
+        background-color: rgba(0, 212, 255, 0.2);
+      }
+
+      .game-mode-select option:checked {
+        background-color: rgba(0, 212, 255, 0.3);
+        color: var(--neon-cyan);
+      }
+
+      /* Customize the picker icon (dropdown arrow) */
+      .game-mode-select::picker-icon {
+        color: var(--neon-cyan);
+      }
+
+      /* Customize the checkmark in the dropdown */
+      .game-mode-select::checkmark {
+        color: var(--neon-cyan);
+        text-shadow: 0 0 5px var(--neon-cyan-glow);
       }
 
       .level-list {
@@ -363,28 +423,36 @@
 
       .level-item {
         padding: 12px 15px;
-        background: #333;
+        background: var(--panel-bg-light);
         border-radius: 8px;
         cursor: pointer;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        transition: background 0.2s;
+        transition: all 0.2s;
         border: 2px solid transparent;
       }
 
       .level-item:hover {
-        background: #3a3a3a;
+        background: rgba(0, 212, 255, 0.15);
+        border-color: rgba(0, 212, 255, 0.5);
+        box-shadow: 0 0 10px rgba(0, 212, 255, 0.2);
       }
 
       .level-item.active {
-        background: #4444c4;
-        border-color: #6666ff;
+        background: rgba(0, 212, 255, 0.2);
+        border-color: var(--neon-cyan);
+        box-shadow: 0 0 15px var(--neon-cyan-glow);
       }
 
       .level-item-name {
         font-weight: 500;
         font-size: 14px;
+        color: var(--text-color);
+      }
+
+      .level-item.active .level-item-name {
+        color: var(--neon-cyan);
       }
 
       .level-item-actions {
@@ -394,37 +462,43 @@
 
       .icon-btn {
         background: transparent;
-        border: none;
-        color: #aaa;
+        border: 1px solid var(--neon-cyan);
+        color: var(--neon-cyan);
         cursor: pointer;
         font-size: 18px;
         padding: 4px 8px;
         border-radius: 4px;
+        box-shadow: 0 0 5px var(--neon-cyan-glow);
+        transition: all 0.2s;
       }
 
       .icon-btn:hover {
-        background: #555;
-        color: #fff;
+        background: rgba(0, 212, 255, 0.2);
+        box-shadow: 0 0 10px var(--neon-cyan);
       }
 
       .game-mode-description {
-        background: #2a2a2a;
+        background: var(--panel-bg);
         border-radius: 8px;
         padding: 10px 12px;
         margin: 10px 10px 0 10px;
         font-size: 12px;
-        color: #aaa;
+        color: var(--neon-cyan);
         text-align: center;
-        border: 1px solid #444;
+        border: 1px solid var(--border-color);
+        box-shadow: 0 0 10px rgba(0, 212, 255, 0.15);
         flex-shrink: 0;
+        text-shadow: 0 0 5px var(--neon-cyan-glow);
       }
 
       .level-info-compact {
-        background: #333;
+        background: var(--panel-bg-light);
+        border: 1px solid var(--border-color);
         border-radius: 8px;
         padding: 12px 15px;
         margin-bottom: 15px;
         font-size: 13px;
+        box-shadow: 0 0 10px rgba(0, 212, 255, 0.1);
       }
 
       .level-info-row {
@@ -438,12 +512,13 @@
       }
 
       .level-info-label {
-        color: #888;
+        color: rgba(0, 212, 255, 0.7);
       }
 
       .level-info-value {
-        color: #fff;
+        color: var(--neon-cyan);
         font-weight: 500;
+        text-shadow: 0 0 5px var(--neon-cyan-glow);
       }
 
       /* Responsive adjustments */
@@ -466,8 +541,13 @@
   <body>
     <div class="header">
       <div class="header-buttons">
-        <button class="btn btn-success" id="testGameBtn" disabled>Test Game</button>
+        <button class="btn btn-success" id="testGameBtn" disabled>
+          Test Game
+        </button>
         <select class="game-mode-select" id="gameModeSelect">
+          <button>
+            <selectedcontent></selectedcontent>
+          </button>
           <option value="staged">Staged</option>
           <option value="timeAttack">Time Attack</option>
           <option value="sprint">Sprint</option>
