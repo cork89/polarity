@@ -50,7 +50,6 @@ const DEFAULT_STAGE_COUNT = 3;
 
 // Current level being edited
 let currentLevel: Level;
-let levels: Level[] = [];
 let currentStageIndex: number = 0;
 
 // Create a new empty level with default stages
@@ -91,7 +90,10 @@ function createEmptyLevel(
 currentLevel = createEmptyLevel();
 
 // Convert grid coordinates to pixel coordinates
-function gridToPixel(gridX: number, gridY: number): { x: number; y: number } {
+function editorGridToPixel(
+  gridX: number,
+  gridY: number,
+): { x: number; y: number } {
   const padding = (CELL_SIZE - 22) / 2; // 22 is the target/attractor size
   return {
     x: gridX * CELL_SIZE + padding,
@@ -188,6 +190,67 @@ function isTargetReachable(
   return false;
 }
 
+// Find all reachable empty squares from player position
+// Returns an array of coordinates for all reachable empty spaces
+function findAllReachableEmptySquares(playerPos: {
+  x: number;
+  y: number;
+}): { x: number; y: number }[] {
+  const visited: boolean[][] = [];
+  for (let y = 0; y < GRID_SIZE; y++) {
+    visited.push(new Array(GRID_SIZE).fill(false));
+  }
+
+  const queue: { x: number; y: number }[] = [playerPos];
+  visited[playerPos.y]![playerPos.x] = true;
+
+  const reachableEmpties: { x: number; y: number }[] = [];
+
+  const directions = [
+    { dx: 0, dy: -1 }, // up
+    { dx: 0, dy: 1 }, // down
+    { dx: -1, dy: 0 }, // left
+    { dx: 1, dy: 0 }, // right
+  ];
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+
+    // Check if current position is empty (valid spawn point)
+    const gridRow = currentLevel.baseGrid[current.y];
+    if (gridRow) {
+      const cell = gridRow[current.x];
+      // Empty space is reachable for spawning
+      if (cell === " ") {
+        reachableEmpties.push({ x: current.x, y: current.y });
+      }
+    }
+
+    // Explore neighbors
+    for (const dir of directions) {
+      const newX = current.x + dir.dx;
+      const newY = current.y + dir.dy;
+
+      if (isValidGridPos(newX, newY)) {
+        const visitedRow = visited[newY];
+        const gridRow = currentLevel.baseGrid[newY];
+
+        if (visitedRow && !visitedRow[newX] && gridRow) {
+          const cell = gridRow[newX];
+          // Can move through empty spaces, attractors, and the player start
+          // Cannot move through walls
+          if (cell !== "W") {
+            visitedRow[newX] = true;
+            queue.push({ x: newX, y: newY });
+          }
+        }
+      }
+    }
+  }
+
+  return reachableEmpties;
+}
+
 // Validate level: check if player exists and all stages have reachable targets
 function validateLevel(): { valid: boolean; error: string | null } {
   const playerPos = findPlayerPosition();
@@ -214,11 +277,18 @@ function validateLevel(): { valid: boolean; error: string | null } {
     return { valid: false, error: "At least one blue magnet required" };
   }
 
-  // Time Attack and Sprint only need a player
+  // Time Attack and Sprint need at least one reachable empty square
+  // (for auto-spawned targets)
   if (
     currentLevel.gameMode === "timeAttack" ||
     currentLevel.gameMode === "sprint"
   ) {
+    if (
+      findAllReachableEmptySquares(playerPos).length !==
+      currentLevel.baseGrid.flat().filter((cell) => cell === " ").length
+    ) {
+      return { valid: false, error: "Level can have unreachable target" };
+    }
     return { valid: true, error: null };
   }
 
@@ -289,25 +359,21 @@ function updateEditorForGameMode() {
 // Update UI based on validation state
 function updateValidationUI() {
   const validation = validateLevel();
-  const saveBtn = document.getElementById("saveBtn") as HTMLButtonElement;
   const canvas = document.getElementById("editorCanvas") as HTMLCanvasElement;
   const validationMessage = document.getElementById(
     "validationMessage",
   ) as HTMLDivElement;
+  const publishBtn = document.getElementById("publishBtn") as HTMLButtonElement;
 
   if (!validation.valid) {
-    saveBtn.disabled = true;
-    saveBtn.style.opacity = "0.5";
-    saveBtn.style.cursor = "not-allowed";
     canvas.classList.add("invalid");
     validationMessage.classList.add("visible");
     validationMessage.textContent = validation.error || "Invalid level";
+    publishBtn.disabled = true;
   } else {
-    saveBtn.disabled = false;
-    saveBtn.style.opacity = "1";
-    saveBtn.style.cursor = "pointer";
     canvas.classList.remove("invalid");
     validationMessage.classList.remove("visible");
+    publishBtn.disabled = false;
   }
 }
 
@@ -408,11 +474,12 @@ function placeObject(gridX: number, gridY: number) {
 
   updateStats();
   updateValidationUI();
+  saveLevelToStorage();
   draw();
 }
 
 // Drawing functions
-function drawGrid() {
+function editorDrawGrid() {
   editorCtx.strokeStyle = "#6a5a4a";
   editorCtx.lineWidth = 2;
 
@@ -439,7 +506,7 @@ function drawCellHighlight(gridX: number, gridY: number) {
   );
 }
 
-function drawPlayer(gridX: number, gridY: number) {
+function editorDrawPlayer(gridX: number, gridY: number) {
   const size = 25;
   const offset = (CELL_SIZE - size) / 2;
 
@@ -461,7 +528,7 @@ function drawPlayer(gridX: number, gridY: number) {
 }
 
 function drawRedAttractor(gridX: number, gridY: number) {
-  const pos = gridToPixel(gridX, gridY);
+  const pos = editorGridToPixel(gridX, gridY);
   editorCtx.fillStyle = "#c44444";
   editorCtx.fillRect(pos.x, pos.y, 22, 22);
   editorCtx.fillStyle = "#ff6666";
@@ -469,7 +536,7 @@ function drawRedAttractor(gridX: number, gridY: number) {
 }
 
 function drawBlueAttractor(gridX: number, gridY: number) {
-  const pos = gridToPixel(gridX, gridY);
+  const pos = editorGridToPixel(gridX, gridY);
   editorCtx.fillStyle = "#4444c4";
   editorCtx.fillRect(pos.x, pos.y, 22, 22);
   editorCtx.fillStyle = "#6666ff";
@@ -477,7 +544,7 @@ function drawBlueAttractor(gridX: number, gridY: number) {
 }
 
 function drawTarget(gridX: number, gridY: number) {
-  const pos = gridToPixel(gridX, gridY);
+  const pos = editorGridToPixel(gridX, gridY);
   editorCtx.fillStyle = "#4CAF50";
   editorCtx.fillRect(pos.x, pos.y, 22, 22);
   editorCtx.fillStyle = "#66ff66";
@@ -515,7 +582,7 @@ function drawGridContents() {
       const cell = row[x];
       switch (cell) {
         case "P":
-          drawPlayer(x, y);
+          editorDrawPlayer(x, y);
           break;
         case "R":
           drawRedAttractor(x, y);
@@ -547,7 +614,7 @@ function draw() {
   editorCtx.fillRect(0, 0, editorCanvas.width, editorCanvas.height);
 
   // Draw grid
-  drawGrid();
+  editorDrawGrid();
 
   // Draw hover highlight
   if (hoveredCell) {
@@ -656,7 +723,8 @@ const GAME_MODE_DESCRIPTIONS: Record<string, string> = {
 function updateGameModeDescription() {
   const descriptionEl = document.getElementById("gameModeDescription");
   if (descriptionEl) {
-    descriptionEl.textContent = GAME_MODE_DESCRIPTIONS[currentLevel.gameMode] || "";
+    descriptionEl.textContent =
+      GAME_MODE_DESCRIPTIONS[currentLevel.gameMode] || "";
   }
 }
 
@@ -730,94 +798,13 @@ function updateStats() {
   if (wallCount) wallCount.textContent = String(counts.walls);
 }
 
-// Level list management
-function renderLevelList() {
-  const listEl = document.getElementById("levelList");
-  if (!listEl) return;
-
-  listEl.innerHTML = "";
-
-  levels.forEach((level, index) => {
-    const item = document.createElement("div");
-    item.className =
-      "level-item" + (level.name === currentLevel.name ? " active" : "");
-
-    const nameSpan = document.createElement("span");
-    nameSpan.className = "level-item-name";
-    nameSpan.textContent = level.name;
-
-    const actions = document.createElement("div");
-    actions.className = "level-item-actions";
-
-    const renameBtn = document.createElement("button");
-    renameBtn.className = "icon-btn";
-    renameBtn.innerHTML = "✎";
-    renameBtn.title = "Rename";
-    renameBtn.onclick = (e) => {
-      e.stopPropagation();
-      const newName = prompt("Enter new level name:", level.name);
-      if (newName && newName.trim()) {
-        level.name = newName.trim();
-        if (level.name === currentLevel.name) {
-          currentLevel.name = level.name;
-        }
-        saveLevelsToStorage();
-        renderLevelList();
-        updateStats();
-      }
-    };
-
-    const deleteBtn = document.createElement("button");
-    deleteBtn.className = "icon-btn";
-    deleteBtn.innerHTML = "🗑";
-    deleteBtn.title = "Delete";
-    deleteBtn.onclick = (e) => {
-      e.stopPropagation();
-      if (confirm(`Delete "${level.name}"?`)) {
-        levels = levels.filter((_, i) => i !== index);
-        if (level.name === currentLevel.name) {
-          currentLevel = createEmptyLevel();
-          if (levels.length > 0 && levels[0]) {
-            loadLevel(levels[0]);
-          }
-        }
-        saveLevelsToStorage();
-        renderLevelList();
-        draw();
-        updateStats();
-      }
-    };
-
-    actions.appendChild(renameBtn);
-    actions.appendChild(deleteBtn);
-
-    item.appendChild(nameSpan);
-    item.appendChild(actions);
-
-    item.onclick = () => {
-      loadLevel(level);
-    };
-
-    listEl.appendChild(item);
-  });
-}
-
-function loadLevel(level: Level) {
-  currentLevel = JSON.parse(JSON.stringify(level)); // Deep copy
-  currentStageIndex = 0; // Reset to first stage
-  renderLevelList();
-  updateStageSelector();
-  updateEditorForGameMode();
-  draw();
-  updateStats();
-  updateValidationUI();
-}
-
 // New level button
 document.getElementById("newLevelBtn")!.addEventListener("click", () => {
   const name = prompt("Enter level name:", "New Level");
   if (name) {
     currentLevel = createEmptyLevel(name.trim() || "New Level");
+    sessionStorage.removeItem(STORAGE_KEY);
+    updateTestGameButtonState();
     updateEditorForGameMode();
     draw();
     updateStats();
@@ -825,110 +812,83 @@ document.getElementById("newLevelBtn")!.addEventListener("click", () => {
   }
 });
 
-// Increment level name (e.g., "Level 1" -> "Level 2")
-function incrementLevelName(name: string): string {
-  const match = name.match(/^(.*?)(\d+)$/);
-  if (match && match[1] !== undefined && match[2] !== undefined) {
-    const prefix = match[1];
-    const num = parseInt(match[2], 10);
-    return `${prefix}${num + 1}`;
+// Test Game button
+document.getElementById("testGameBtn")!.addEventListener("click", () => {
+  const stored = sessionStorage.getItem(STORAGE_KEY);
+  if (stored) {
+    const data = {
+      level: JSON.parse(stored),
+    };
+    const json = JSON.stringify(data);
+    const encoded = encodeURIComponent(json);
+    window.location.href = `play.html#${encoded}`;
+    // window.open(`play.html#${encoded}`);
   }
-  // If no number at the end, just append " 2"
-  return `${name} 2`;
-}
-
-// Save button
-document.getElementById("saveBtn")!.addEventListener("click", () => {
-  const validation = validateLevel();
-  if (!validation.valid) {
-    alert("Cannot save: " + validation.error);
-    return;
-  }
-
-  const existingIndex = levels.findIndex((l) => l.name === currentLevel.name);
-  if (existingIndex !== -1) {
-    levels[existingIndex] = JSON.parse(JSON.stringify(currentLevel));
-  } else {
-    levels.push(JSON.parse(JSON.stringify(currentLevel)));
-  }
-  saveLevelsToStorage();
-  renderLevelList();
-
-  // Increment the name for the next level
-  currentLevel.name = incrementLevelName(currentLevel.name);
-  // Clear the base grid for the new level (keep player)
-  for (let y = 0; y < GRID_SIZE; y++) {
-    const row = currentLevel.baseGrid[y];
-    if (!row) continue;
-    for (let x = 0; x < GRID_SIZE; x++) {
-      if (row[x] !== "P") {
-        row[x] = " ";
-      }
-    }
-  }
-  // Reset stages for the new level
-  currentLevel.stages = [];
-  for (let i = 0; i < DEFAULT_STAGE_COUNT; i++) {
-    currentLevel.stages.push({ targets: [] });
-  }
-  currentStageIndex = 0;
-
-  updateStats();
-  updateValidationUI();
-  draw();
-  alert("Level saved! Ready to create the next level.");
 });
 
-// Test in game
-document.getElementById("testBtn")!.addEventListener("click", () => {
-  const data = {
-    level: currentLevel,
-  };
-  const json = JSON.stringify(data);
-  const encoded = encodeURIComponent(json);
-  window.open(`play.html#${encoded}`, "_blank");
+// Publish button
+document.getElementById("publishBtn")!.addEventListener("click", () => {
+  console.log("published");
 });
 
-// LocalStorage management
-const STORAGE_KEY = "polarity_levels_v2";
+// SessionStorage management
+const STORAGE_KEY = "polarity_editor_level";
 
-function saveLevelsToStorage() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(levels));
+function saveLevelToStorage() {
+  sessionStorage.setItem(STORAGE_KEY, JSON.stringify(currentLevel));
+  updateTestGameButtonState();
 }
 
-function loadLevelsFromStorage() {
-  const stored = localStorage.getItem(STORAGE_KEY);
+function loadLevelFromStorage() {
+  const stored = sessionStorage.getItem(STORAGE_KEY);
   if (stored) {
     try {
-      levels = JSON.parse(stored);
+      const savedLevel = JSON.parse(stored) as Level;
+      currentLevel = savedLevel;
+      currentStageIndex = 0;
+      updateEditorForGameMode();
+      updateStageSelector();
+      draw();
+      updateStats();
+      updateValidationUI();
     } catch (e) {
-      levels = [];
+      // If parsing fails, keep the default level
+      console.error("Failed to load level from sessionStorage:", e);
     }
   }
+}
 
-  if (levels.length === 0) {
-    // Create a default level
-    const defaultLevel = createEmptyLevel("Level 1");
-    const row0 = defaultLevel.baseGrid[0];
-    const row3 = defaultLevel.baseGrid[3];
-    if (row0) row0[5] = "R"; // Red at top right
-    if (row3) row3[2] = "B"; // Blue at middle left
-    // Add targets to stage 1
-    if (defaultLevel.stages[0]) {
-      defaultLevel.stages[0].targets.push({ x: 5, y: 2 }); // Target
-      defaultLevel.stages[0].targets.push({ x: 1, y: 1 }); // Target
-    }
-    levels.push(defaultLevel);
-    saveLevelsToStorage();
-  }
-
-  if (levels.length > 0 && levels[0]) {
-    loadLevel(levels[0]);
+function updateTestGameButtonState() {
+  const testGameBtn = document.getElementById(
+    "testGameBtn",
+  ) as HTMLButtonElement;
+  if (testGameBtn) {
+    const hasSavedLevel = sessionStorage.getItem(STORAGE_KEY) !== null;
+    testGameBtn.disabled = !hasSavedLevel;
   }
 }
 
 // Initialize
+// Toolbar overflow detection
+function updateToolbarOverflow() {
+  const toolbarContainer = document.querySelector(
+    ".toolbar-container",
+  ) as HTMLElement;
+  const toolbar = document.querySelector(".toolbar") as HTMLElement;
+  if (toolbarContainer && toolbar) {
+    const hasOverflow = toolbar.scrollWidth > toolbar.clientWidth;
+    toolbarContainer.classList.toggle("has-overflow", hasOverflow);
+  }
+}
+
+// Check overflow on load and resize
+window.addEventListener("load", updateToolbarOverflow);
+window.addEventListener("resize", updateToolbarOverflow);
+
+// Initialize
 draw();
 updateStats();
-loadLevelsFromStorage();
+loadLevelFromStorage();
+updateTestGameButtonState();
 updateValidationUI();
+updateToolbarOverflow();

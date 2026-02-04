@@ -420,7 +420,10 @@ function fadeAudio(
 }
 
 // Convert grid coordinates to pixel coordinates
-function gridToPixel(gridX: number, gridY: number): { x: number; y: number } {
+function playGridToPixel(
+  gridX: number,
+  gridY: number,
+): { x: number; y: number } {
   const padding = (PLAY_CELL_SIZE - TARGET_SIZE) / 2;
   return {
     x: gridX * PLAY_CELL_SIZE + padding,
@@ -448,14 +451,14 @@ function parseGrid(grid: string[][]) {
           playerY = y;
           break;
         case "R":
-          reds.push(gridToPixel(x, y));
+          reds.push(playGridToPixel(x, y));
           break;
         case "B":
-          blues.push(gridToPixel(x, y));
+          blues.push(playGridToPixel(x, y));
           break;
         case "T":
           targs.push({
-            ...gridToPixel(x, y),
+            ...playGridToPixel(x, y),
             collected: false,
             rotationOffset: Math.random() * Math.PI * 2,
           });

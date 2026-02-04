@@ -33,12 +33,6 @@
         flex-shrink: 0;
       }
 
-      .header h1 {
-        font-size: 18px;
-        color: #fff;
-        font-weight: 600;
-      }
-
       .header-buttons {
         display: flex;
         gap: 8px;
@@ -107,6 +101,7 @@
         background: #333;
         border-radius: 8px;
         padding: 8px;
+        margin: 10px 10px 0 10px;
         flex-shrink: 0;
       }
 
@@ -139,6 +134,25 @@
         border-radius: 8px;
         padding: 8px;
         flex-shrink: 0;
+        position: relative;
+      }
+
+      .toolbar-container::after {
+        content: "";
+        position: absolute;
+        right: 8px;
+        top: 8px;
+        bottom: 8px;
+        width: 30px;
+        background: linear-gradient(to right, transparent, #333);
+        pointer-events: none;
+        border-radius: 0 8px 8px 0;
+        opacity: 0;
+        transition: opacity 0.3s;
+      }
+
+      .toolbar-container.has-overflow::after {
+        opacity: 1;
       }
 
       .toolbar {
@@ -146,12 +160,26 @@
         gap: 8px;
         overflow-x: auto;
         padding: 4px;
-        scrollbar-width: none;
-        -ms-overflow-style: none;
+        scrollbar-width: thin;
+        scrollbar-color: #555 #333;
       }
 
       .toolbar::-webkit-scrollbar {
-        display: none;
+        height: 6px;
+      }
+
+      .toolbar::-webkit-scrollbar-track {
+        background: #333;
+        border-radius: 3px;
+      }
+
+      .toolbar::-webkit-scrollbar-thumb {
+        background: #555;
+        border-radius: 3px;
+      }
+
+      .toolbar::-webkit-scrollbar-thumb:hover {
+        background: #666;
       }
 
       .tool-btn {
@@ -218,16 +246,6 @@
         background: #888;
       }
 
-      /* Footer Actions */
-      .footer-actions {
-        display: flex;
-        gap: 8px;
-        background: #333;
-        border-radius: 8px;
-        padding: 10px;
-        flex-shrink: 0;
-      }
-
       .btn {
         padding: 10px 14px;
         background: #4444c4;
@@ -259,6 +277,12 @@
 
       .btn-success:hover {
         background: #5cbf60;
+      }
+
+      .btn:disabled {
+        background: #555;
+        opacity: 0.5;
+        cursor: not-allowed;
       }
 
       .game-mode-select {
@@ -387,6 +411,7 @@
         background: #2a2a2a;
         border-radius: 8px;
         padding: 10px 12px;
+        margin: 10px 10px 0 10px;
         font-size: 12px;
         color: #aaa;
         text-align: center;
@@ -423,6 +448,13 @@
 
       /* Responsive adjustments */
       @media (min-width: 600px) {
+        .stage-selector,
+        .game-mode-description {
+          max-width: 600px;
+          margin-left: auto;
+          margin-right: auto;
+        }
+
         .main-container {
           max-width: 600px;
           margin: 0 auto;
@@ -433,13 +465,28 @@
   </head>
   <body>
     <div class="header">
-      <h1>Editor</h1>
       <div class="header-buttons">
-        <button class="btn btn-success" id="testBtn">Test</button>
-        <button class="btn btn-secondary" onclick="location.href='index.html'">
-          Game
-        </button>
+        <button class="btn btn-success" id="testGameBtn" disabled>Test Game</button>
+        <select class="game-mode-select" id="gameModeSelect">
+          <option value="staged">Staged</option>
+          <option value="timeAttack">Time Attack</option>
+          <option value="sprint">Sprint</option>
+        </select>
+        <button class="btn" id="newLevelBtn">New</button>
+        <button class="btn" id="publishBtn">Publish</button>
       </div>
+    </div>
+
+    <!-- Stage Selector -->
+    <div class="stage-selector">
+      <button class="stage-btn active" data-stage="0">Stage 1</button>
+      <button class="stage-btn" data-stage="1">Stage 2</button>
+      <button class="stage-btn" data-stage="2">Stage 3</button>
+    </div>
+
+    <!-- Game Mode Description -->
+    <div class="game-mode-description" id="gameModeDescription">
+      Complete 3 stages by collecting all targets in each stage
     </div>
 
     <div class="main-container">
@@ -449,13 +496,6 @@
         <div class="validation-message" id="validationMessage">
           Target unreachable
         </div>
-      </div>
-
-      <!-- Stage Selector -->
-      <div class="stage-selector">
-        <button class="stage-btn active" data-stage="0">Stage 1</button>
-        <button class="stage-btn" data-stage="1">Stage 2</button>
-        <button class="stage-btn" data-stage="2">Stage 3</button>
       </div>
 
       <!-- Toolbar -->
@@ -491,62 +531,6 @@
             <span class="tool-label">Erase</span>
           </button>
         </div>
-      </div>
-
-      <!-- Game Mode Description -->
-      <div class="game-mode-description" id="gameModeDescription">
-        Complete 3 stages by collecting all targets in each stage
-      </div>
-
-      <!-- Footer Actions -->
-      <div class="footer-actions">
-        <button class="btn btn-secondary" id="levelsBtn" popovertarget="levelsPopover">
-          Levels
-        </button>
-        <select class="game-mode-select" id="gameModeSelect">
-          <option value="staged">Staged</option>
-          <option value="timeAttack">Time Attack</option>
-          <option value="sprint">Sprint</option>
-        </select>
-        <button class="btn" id="newLevelBtn">New</button>
-        <button class="btn btn-success" id="saveBtn">Save</button>
-      </div>
-    </div>
-
-    <!-- Levels Popover -->
-    <div id="levelsPopover" popover>
-      <div class="popover-header">
-        <h3>Levels</h3>
-        <button class="close-btn" popovertarget="levelsPopover" popovertargetaction="hide">
-          ×
-        </button>
-      </div>
-
-      <div class="level-info-compact">
-        <div class="level-info-row">
-          <span class="level-info-label">Current:</span>
-          <span class="level-info-value" id="currentLevelName">Untitled</span>
-        </div>
-        <div class="level-info-row">
-          <span class="level-info-label">Red:</span>
-          <span class="level-info-value" id="redCount">0</span>
-        </div>
-        <div class="level-info-row">
-          <span class="level-info-label">Blue:</span>
-          <span class="level-info-value" id="blueCount">0</span>
-        </div>
-        <div class="level-info-row">
-          <span class="level-info-label">Targets:</span>
-          <span class="level-info-value" id="targetCount">0</span>
-        </div>
-        <div class="level-info-row">
-          <span class="level-info-label">Walls:</span>
-          <span class="level-info-value" id="wallCount">0</span>
-        </div>
-      </div>
-
-      <div class="level-list" id="levelList">
-        <!-- Level items will be inserted here -->
       </div>
     </div>
 
