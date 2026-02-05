@@ -21,6 +21,19 @@
         --neon-orange-glow: rgba(255, 107, 53, 0.6);
         --panel-bg: #1a1a2e;
         --panel-bg-light: #252542;
+        --radius-sm: 4px;
+        --radius-md: 6px;
+        --radius-lg: 8px;
+        --transition-fast: all 0.2s;
+        --gap-sm: 5px;
+        --gap-md: 8px;
+        --gap-lg: 10px;
+        --padding-sm: 8px;
+        --padding-md: 10px;
+        --padding-lg: 12px;
+        --shadow-cyan: 0 0 10px var(--neon-cyan-glow);
+        --shadow-cyan-lg: 0 0 15px var(--neon-cyan-glow);
+        --shadow-cyan-inset: inset 0 0 30px rgba(0, 212, 255, 0.05);
       }
 
       * {
@@ -53,7 +66,8 @@
 
       .header-buttons {
         display: flex;
-        gap: 8px;
+        gap: var(--gap-md);
+        margin: 0 auto;
       }
 
       /* Main Content Area */
@@ -61,8 +75,8 @@
         flex: 1;
         display: flex;
         flex-direction: column;
-        padding: 10px;
-        gap: 10px;
+        padding: var(--gap-lg);
+        gap: var(--gap-lg);
         overflow-y: auto;
         min-height: 0;
       }
@@ -72,14 +86,13 @@
         display: flex;
         justify-content: center;
         align-items: center;
-        background: var(--panel-bg);
+        /* background: var(--panel-bg);
         border: 2px solid var(--border-color);
-        border-radius: 8px;
-        padding: 10px;
+        border-radius: var(--radius-lg); */
+        /* padding: var(--gap-lg); */
         position: relative;
         flex-shrink: 0;
-        box-shadow: 0 0 20px rgba(0, 212, 255, 0.2),
-          inset 0 0 30px rgba(0, 212, 255, 0.05);
+        /* box-shadow: 0 0 20px rgba(0, 212, 255, 0.2), var(--shadow-cyan-inset); */
       }
 
       #editorCanvas {
@@ -103,8 +116,8 @@
         transform: translate(-50%, -50%);
         background: rgba(255, 107, 53, 0.95);
         color: white;
-        padding: 10px 16px;
-        border-radius: 6px;
+        padding: var(--padding-md) 16px;
+        border-radius: var(--radius-md);
         font-weight: bold;
         font-size: 13px;
         pointer-events: none;
@@ -113,7 +126,6 @@
         white-space: nowrap;
         box-shadow: 0 0 20px var(--neon-orange-glow);
         border: 2px solid var(--neon-orange);
-        font-family: "Orbitron", sans-serif;
         text-shadow: 0 0 5px var(--neon-orange-glow);
       }
 
@@ -124,12 +136,12 @@
       /* Stage Selector */
       .stage-selector {
         display: flex;
-        gap: 5px;
+        gap: var(--gap-sm);
         background: var(--panel-bg);
         border: 1px solid var(--border-color);
-        border-radius: 8px;
-        padding: 8px;
-        margin: 10px 10px 0 10px;
+        border-radius: var(--radius-lg);
+        padding: var(--padding-sm);
+        margin: var(--gap-lg) var(--gap-lg) 0 var(--gap-lg);
         flex-shrink: 0;
         box-shadow: 0 0 10px rgba(0, 212, 255, 0.15);
       }
@@ -139,20 +151,20 @@
         padding: 8px 6px;
         background: var(--panel-bg-light);
         border: 2px solid transparent;
-        border-radius: 6px;
+        border-radius: var(--radius-md);
         color: var(--text-color);
         cursor: pointer;
         font-size: 12px;
         font-weight: 500;
         font-family: "Orbitron", sans-serif;
-        transition: all 0.2s;
+        transition: var(--transition-fast);
         min-width: 60px;
       }
 
       .stage-btn:hover {
         background: rgba(0, 212, 255, 0.2);
         border-color: var(--neon-cyan);
-        box-shadow: 0 0 10px var(--neon-cyan-glow);
+        box-shadow: var(--shadow-cyan);
       }
 
       .stage-btn.active {
@@ -165,8 +177,8 @@
       .toolbar-container {
         background: var(--panel-bg);
         border: 1px solid var(--border-color);
-        border-radius: 8px;
-        padding: 8px;
+        border-radius: var(--radius-lg);
+        padding: var(--padding-sm);
         flex-shrink: 0;
         position: relative;
         box-shadow: 0 0 10px rgba(0, 212, 255, 0.15);
@@ -192,7 +204,7 @@
 
       .toolbar {
         display: flex;
-        gap: 8px;
+        gap: var(--gap-md);
         overflow-x: auto;
         padding: 4px;
         scrollbar-width: thin;
@@ -223,13 +235,13 @@
         align-items: center;
         justify-content: center;
         gap: 4px;
-        padding: 8px 12px;
+        padding: var(--padding-sm) 12px;
         background: var(--panel-bg-light);
         border: 2px solid transparent;
-        border-radius: 8px;
         color: var(--text-color);
+        border-radius: var(--radius-lg);
         cursor: pointer;
-        transition: all 0.2s;
+        transition: var(--transition-fast);
         min-width: 60px;
         min-height: 60px;
         flex-shrink: 0;
@@ -239,13 +251,13 @@
       .tool-btn:hover {
         background: rgba(0, 212, 255, 0.2);
         border-color: var(--neon-cyan);
-        box-shadow: 0 0 10px var(--neon-cyan-glow);
+        box-shadow: var(--shadow-cyan);
       }
 
       .tool-btn.active {
         background: rgba(0, 212, 255, 0.25);
         border-color: var(--neon-cyan);
-        box-shadow: 0 0 15px var(--neon-cyan-glow);
+        box-shadow: var(--shadow-cyan-lg);
       }
 
       .tool-icon {
@@ -292,18 +304,17 @@
       }
 
       .btn {
-        padding: 10px 14px;
+        padding: var(--padding-md) 14px;
         background: rgba(0, 212, 255, 0.15);
         border: 1px solid white;
-        border-radius: 6px;
+        border-radius: var(--radius-md);
         color: white;
         cursor: pointer;
         font-size: 13px;
         font-weight: 500;
         font-family: "Orbitron", sans-serif;
-        transition: all 0.2s;
+        transition: var(--transition-fast);
         flex: 1;
-        /* box-shadow: 0 0 10px var(--neon-cyan-glow); */
       }
 
       .btn:hover {
@@ -358,14 +369,13 @@
       /* Style the trigger button */
       .game-mode-select button {
         width: 100%;
-        padding: 10px 12px;
+        padding: var(--padding-md) var(--padding-lg);
         font-size: 13px;
         background-color: var(--panel-bg-light);
-        color: var(--text-color);
         border: 2px solid var(--neon-cyan);
-        border-radius: 6px;
+        border-radius: var(--radius-md);
         cursor: pointer;
-        box-shadow: 0 0 10px var(--neon-cyan-glow);
+        box-shadow: var(--shadow-cyan);
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -380,16 +390,14 @@
       .game-mode-select::picker(select) {
         background-color: var(--panel-bg);
         border: 2px solid var(--neon-cyan);
-        border-radius: 6px;
+        border-radius: var(--radius-md);
         box-shadow: 0 0 20px var(--neon-cyan-glow);
       }
 
       /* Style the options */
       .game-mode-select option {
-        padding: 10px 12px;
-        font-family: "Orbitron", sans-serif;
+        padding: var(--padding-md) 12px;
         font-size: 13px;
-        color: var(--text-color);
         background-color: var(--panel-bg);
         cursor: pointer;
       }
@@ -417,19 +425,19 @@
       .level-list {
         display: flex;
         flex-direction: column;
-        gap: 8px;
+        gap: var(--gap-md);
         margin-bottom: 15px;
       }
 
       .level-item {
-        padding: 12px 15px;
+        padding: var(--padding-lg) 15px;
         background: var(--panel-bg-light);
-        border-radius: 8px;
+        border-radius: var(--radius-lg);
         cursor: pointer;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        transition: all 0.2s;
+        transition: var(--transition-fast);
         border: 2px solid transparent;
       }
 
@@ -448,7 +456,6 @@
       .level-item-name {
         font-weight: 500;
         font-size: 14px;
-        color: var(--text-color);
       }
 
       .level-item.active .level-item-name {
@@ -457,7 +464,7 @@
 
       .level-item-actions {
         display: flex;
-        gap: 8px;
+        gap: var(--gap-md);
       }
 
       .icon-btn {
@@ -466,10 +473,10 @@
         color: var(--neon-cyan);
         cursor: pointer;
         font-size: 18px;
-        padding: 4px 8px;
-        border-radius: 4px;
+        padding: 4px var(--padding-sm);
+        border-radius: var(--radius-sm);
         box-shadow: 0 0 5px var(--neon-cyan-glow);
-        transition: all 0.2s;
+        transition: var(--transition-fast);
       }
 
       .icon-btn:hover {
@@ -479,9 +486,9 @@
 
       .game-mode-description {
         background: var(--panel-bg);
-        border-radius: 8px;
-        padding: 10px 12px;
-        margin: 10px 10px 0 10px;
+        border-radius: var(--radius-lg);
+        padding: var(--padding-md) var(--padding-lg);
+        margin: var(--gap-lg) var(--gap-lg) 0 var(--gap-lg);
         font-size: 12px;
         color: var(--neon-cyan);
         text-align: center;
@@ -494,8 +501,8 @@
       .level-info-compact {
         background: var(--panel-bg-light);
         border: 1px solid var(--border-color);
-        border-radius: 8px;
-        padding: 12px 15px;
+        border-radius: var(--radius-lg);
+        padding: var(--padding-lg) 15px;
         margin-bottom: 15px;
         font-size: 13px;
         box-shadow: 0 0 10px rgba(0, 212, 255, 0.1);
@@ -597,8 +604,8 @@
           </button>
 
           <button class="tool-btn tool-target" data-tool="target">
-            <div class="tool-icon">G</div>
-            <span class="tool-label">Goal</span>
+            <div class="tool-icon">T</div>
+            <span class="tool-label">Target</span>
           </button>
 
           <button class="tool-btn tool-wall" data-tool="wall">
