@@ -12,8 +12,10 @@
       }
 
       body {
-        min-height: 100vh;
-        background-image: url("polaritypenguin.webp");
+        height: 100vh;
+        width: 100vw;
+        overflow: hidden;
+        /* background-image: url("polaritypenguin.webp"); */
         background-size: cover;
         background-position: center;
         background-repeat: no-repeat;
@@ -39,6 +41,7 @@
         border-radius: 8px;
         box-shadow: 0 0 10px rgba(0, 255, 255, 0.5),
           inset 0 0 10px rgba(0, 255, 255, 0.1);
+        z-index: 5;
       }
 
       button:hover {
@@ -52,11 +55,76 @@
       button:active {
         transform: scale(0.98);
       }
+
+      #scene-container {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background-color: #050515;
+        overflow: hidden;
+      }
+
+      #arc-svg {
+        position: absolute;
+        width: 250%;
+        height: 180%;
+        pointer-events: none;
+        z-index: 2;
+      }
+
+      .image-overlay {
+        position: relative;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+        height: 100%;
+      }
+
+      .penguin {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .main-img {
+        z-index: 3;
+      }
+
+      .back-img {
+        z-index: 1;
+      }
+      .button-container {
+        display: flex;
+        flex-direction: column;
+        gap: 2em;
+      }
     </style>
   </head>
   <body>
-    <button id="play">Play</button>
-    <button id="editor">Editor</button>
+    <div id="scene-container">
+      <svg id="arc-svg" viewBox="0 0 2000 2000"></svg>
+      <div class="image-overlay">
+        <img
+          src="polaritypenguint.webp"
+          class="penguin main-img"
+          alt="Penguin"
+        />
+        <img
+          src="polaritypenguin.webp"
+          class="penguin back-img"
+          alt="Polarity Penguin"
+        />
+        <div class="button-container">
+          <button id="play">Play</button>
+          <button id="editor">Editor</button>
+        </div>
+      </div>
+    </div>
     <script type="module" src="splash.ts"></script>
   </body>
 </html>
