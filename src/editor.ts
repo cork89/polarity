@@ -323,11 +323,11 @@ function updateEditorForGameMode() {
     ".stage-selector",
   ) as HTMLElement;
   const targetCountEl = document.getElementById("targetCount")?.parentElement;
+
+  // Sync select to match current level
   const gameModeSelect = document.getElementById(
     "gameModeSelect",
   ) as HTMLSelectElement;
-
-  // Update the game mode selector to match current level
   if (gameModeSelect) {
     gameModeSelect.value = currentLevel.gameMode;
   }
@@ -365,11 +365,30 @@ function updateValidationUI() {
   ) as HTMLDivElement;
   const publishBtn = document.getElementById("publishBtn") as HTMLButtonElement;
 
+  // Clear all stage validation indicators first
+  document.querySelectorAll(".stage-btn").forEach((btn) => {
+    btn.classList.remove("has-validation");
+  });
+
   if (!validation.valid) {
     canvas.classList.add("invalid");
     validationMessage.classList.add("visible");
     validationMessage.textContent = validation.error || "Invalid level";
     publishBtn.disabled = true;
+
+    // Add pulsing glow to the stage with validation error
+    if (validation.error && validation.error.startsWith("Stage ")) {
+      const match = validation.error.match(/Stage (\d+)/);
+      if (match) {
+        const stageNum = parseInt(match[1], 10);
+        const stageBtn = document.querySelector(
+          `.stage-btn[data-stage="${stageNum - 1}"]`,
+        );
+        if (stageBtn) {
+          stageBtn.classList.add("has-validation");
+        }
+      }
+    }
   } else {
     canvas.classList.remove("invalid");
     validationMessage.classList.remove("visible");
@@ -800,16 +819,16 @@ function updateStats() {
 
 // New level button
 document.getElementById("newLevelBtn")!.addEventListener("click", () => {
-  const name = prompt("Enter level name:", "New Level");
-  if (name) {
-    currentLevel = createEmptyLevel(name.trim() || "New Level");
-    sessionStorage.removeItem(STORAGE_KEY);
-    updateTestGameButtonState();
-    updateEditorForGameMode();
-    draw();
-    updateStats();
-    updateValidationUI();
-  }
+  // const name = prompt("Enter level name:", "New Level");
+  // if (name) {
+  currentLevel = createEmptyLevel("New Level");
+  sessionStorage.removeItem(STORAGE_KEY);
+  updateTestGameButtonState();
+  updateEditorForGameMode();
+  draw();
+  updateStats();
+  updateValidationUI();
+  // }
 });
 
 // Test Game button

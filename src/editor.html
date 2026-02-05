@@ -173,6 +173,25 @@
         box-shadow: 0 0 15px rgba(76, 175, 80, 0.5);
       }
 
+      .stage-btn.has-validation {
+        animation: pulse-validation 1.5s ease-in-out infinite;
+      }
+
+      @keyframes pulse-validation {
+        0%, 100% {
+          box-shadow: 0 0 5px var(--neon-orange-glow),
+                      0 0 10px var(--neon-orange-glow),
+                      inset 0 0 5px rgba(255, 107, 53, 0.2);
+          border-color: var(--neon-orange);
+        }
+        50% {
+          box-shadow: 0 0 15px var(--neon-orange-glow),
+                      0 0 25px var(--neon-orange-glow),
+                      inset 0 0 15px rgba(255, 107, 53, 0.4);
+          border-color: #ff8a5c;
+        }
+      }
+
       /* Toolbar */
       .toolbar-container {
         background: var(--panel-bg);
@@ -306,7 +325,7 @@
       .btn {
         padding: var(--padding-md) 14px;
         background: rgba(0, 212, 255, 0.15);
-        border: 1px solid white;
+        border: 2px solid var(--neon-cyan);
         border-radius: var(--radius-md);
         color: white;
         cursor: pointer;
@@ -355,71 +374,46 @@
         box-shadow: none;
       }
 
-      /* Base select styling with new customizable select API */
-      .game-mode-select,
-      ::picker(select) {
-        appearance: base-select;
+      .reset-btn {
+        border: 2px solid var(--neon-orange);
       }
 
+      .reset-btn:hover {
+        background: rgba(121, 61, 12, 0.3);
+        box-shadow: 0 0 15px var(--neon-orange);
+      }
+
+      /* Standard game mode select */
       .game-mode-select {
         flex: 1;
         font-family: "Orbitron", sans-serif;
-      }
-
-      /* Style the trigger button */
-      .game-mode-select button {
-        width: 100%;
-        padding: var(--padding-md) var(--padding-lg);
         font-size: 13px;
         background-color: var(--panel-bg-light);
         border: 2px solid var(--neon-cyan);
         border-radius: var(--radius-md);
         cursor: pointer;
+        padding: var(--padding-md) var(--padding-lg);
+        color: var(--text-color);
         box-shadow: var(--shadow-cyan);
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
+        width: 100px;
       }
 
-      .game-mode-select button:hover {
+      .game-mode-select:hover {
         background-color: rgba(0, 212, 255, 0.2);
         box-shadow: 0 0 15px var(--neon-cyan-glow);
       }
 
-      /* Style the dropdown picker */
-      .game-mode-select::picker(select) {
-        background-color: var(--panel-bg);
-        border: 2px solid var(--neon-cyan);
-        border-radius: var(--radius-md);
-        box-shadow: 0 0 20px var(--neon-cyan-glow);
+      .game-mode-select:focus {
+        outline: none;
+        box-shadow: 0 0 15px var(--neon-cyan-glow);
       }
 
-      /* Style the options */
       .game-mode-select option {
-        padding: var(--padding-md) 12px;
-        font-size: 13px;
         background-color: var(--panel-bg);
-        cursor: pointer;
-      }
-
-      .game-mode-select option:hover {
-        background-color: rgba(0, 212, 255, 0.2);
-      }
-
-      .game-mode-select option:checked {
-        background-color: rgba(0, 212, 255, 0.3);
-        color: var(--neon-cyan);
-      }
-
-      /* Customize the picker icon (dropdown arrow) */
-      .game-mode-select::picker-icon {
-        color: var(--neon-cyan);
-      }
-
-      /* Customize the checkmark in the dropdown */
-      .game-mode-select::checkmark {
-        color: var(--neon-cyan);
-        text-shadow: 0 0 5px var(--neon-cyan-glow);
+        color: var(--text-color);
+        font-family: "Orbitron", sans-serif;
+        font-size: 13px;
+        padding: var(--padding-md);
       }
 
       .level-list {
@@ -548,20 +542,21 @@
   <body>
     <div class="header">
       <div class="header-buttons">
-        <button class="btn btn-success" id="testGameBtn" disabled>
-          Test Game
-        </button>
-        <select class="game-mode-select" id="gameModeSelect">
-          <button>
-            <selectedcontent></selectedcontent>
-          </button>
+        <button class="btn reset-btn" id="newLevelBtn">Reset</button>
+        <select class="btn game-mode-select" id="gameModeSelect">
           <option value="staged">Staged</option>
           <option value="timeAttack">Time Attack</option>
           <option value="sprint">Sprint</option>
         </select>
-        <button class="btn" id="newLevelBtn">New</button>
+        <button class="btn btn-success" id="testGameBtn" disabled>
+          Test Game
+        </button>
         <button class="btn" id="publishBtn">Publish</button>
       </div>
+    </div>
+    <!-- Game Mode Description -->
+    <div class="game-mode-description" id="gameModeDescription">
+      Complete 3 stages by collecting all targets in each stage
     </div>
 
     <!-- Stage Selector -->
@@ -569,11 +564,6 @@
       <button class="stage-btn active" data-stage="0">Stage 1</button>
       <button class="stage-btn" data-stage="1">Stage 2</button>
       <button class="stage-btn" data-stage="2">Stage 3</button>
-    </div>
-
-    <!-- Game Mode Description -->
-    <div class="game-mode-description" id="gameModeDescription">
-      Complete 3 stages by collecting all targets in each stage
     </div>
 
     <div class="main-container">
