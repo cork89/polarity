@@ -49,9 +49,7 @@ const scoreFont = document.getElementById(
 const timerFont = document.getElementById(
   "timerFont",
 ) as HTMLSpanElement | null;
-const levelSelect = document.getElementById(
-  "levelSelect",
-) as HTMLSelectElement | null;
+const controls = document.getElementById("controls") as HTMLDivElement | null;
 
 // Critical game over UI elements - fail fast if missing
 const gameOverOverlay = getRequiredElement<HTMLDivElement>("gameOverOverlay");
@@ -63,7 +61,7 @@ const gameOverButton = getRequiredElement<HTMLButtonElement>("gameOverButton");
 const muteButton = document.getElementById("muteButton");
 const audioPlayingIcon = document.getElementById("audioPlayingIcon");
 const audioMutedIcon = document.getElementById("audioMutedIcon");
-let isMuted = false;
+let isMuted = sessionStorage.getItem("polarity_mute_state") === "true";
 
 // Game settings
 const PLAY_GRID_SIZE = 6;
@@ -338,6 +336,9 @@ const allSounds = [blueSound, redSound, collectSound, bgSynth1, bgSynth2];
 function toggleMute(): void {
   isMuted = !isMuted;
 
+  // Save to sessionStorage
+  sessionStorage.setItem("polarity_mute_state", String(isMuted));
+
   // Update all sound volumes
   for (const sound of allSounds) {
     sound.muted = isMuted;
@@ -360,6 +361,29 @@ function toggleMute(): void {
 if (muteButton) {
   muteButton.addEventListener("click", toggleMute);
 }
+
+// Initialize mute button appearance from sessionStorage
+function initializeMuteState(): void {
+  // Apply mute state to sounds
+  for (const sound of allSounds) {
+    sound.muted = isMuted;
+  }
+
+  // Update button appearance
+  if (muteButton) {
+    if (isMuted) {
+      muteButton.classList.add("muted");
+      if (audioPlayingIcon) audioPlayingIcon.style.display = "none";
+      if (audioMutedIcon) audioMutedIcon.style.display = "block";
+    } else {
+      muteButton.classList.remove("muted");
+      if (audioPlayingIcon) audioPlayingIcon.style.display = "block";
+      if (audioMutedIcon) audioMutedIcon.style.display = "none";
+    }
+  }
+}
+
+initializeMuteState();
 
 function playNextBgTrack(): void {
   if (currentBgTrack === 1) {
@@ -718,51 +742,6 @@ function getLevelDisplayName(level: LevelData): string {
   return `${level.name} ${modeTag}`;
 }
 
-// Populate level selector
-function populateLevelSelector() {
-  if (!levelSelect) return;
-
-  const levels = getStoredLevels();
-
-  // Clear existing options
-  levelSelect.innerHTML = '<option value="">-- Random Level --</option>';
-
-  // Add stored levels
-  levels.forEach((level, index) => {
-    const option = document.createElement("option");
-    option.value = String(index);
-    option.textContent = getLevelDisplayName(level);
-    levelSelect.appendChild(option);
-  });
-
-  // Select current level if loaded from hash
-  if (currentLevelName) {
-    const index = levels.findIndex((l) => l.name === currentLevelName);
-    if (index !== -1) {
-      levelSelect.value = String(index);
-    }
-  }
-}
-
-// Handle level selection
-if (levelSelect) {
-  levelSelect.addEventListener("change", () => {
-    const selectedIndex = parseInt(levelSelect.value);
-    if (!isNaN(selectedIndex)) {
-      const levels = getStoredLevels();
-      const level = levels[selectedIndex];
-      if (level) {
-        loadLevel(level);
-      }
-    } else {
-      // Random level selected
-      loadDefaultLevel();
-      score = 0;
-      updateScoreFont(0);
-    }
-  });
-}
-
 // Check for level in URL hash (from editor "Test in Game")
 function checkForEditorLevel() {
   const hash = window.location.hash.slice(1); // Remove #
@@ -784,6 +763,20 @@ function checkForEditorLevel() {
       console.error("Failed to parse level from URL:", e);
     }
   }
+  const sessionStorageData = sessionStorage.getItem("polarity_editor_level");
+  if (sessionStorageData) {
+    try {
+      const level = JSON.parse(sessionStorageData) as LevelData;
+      if (level.grid || (level.baseGrid && level.stages)) {
+        loadLevel(level);
+        score = 0;
+        updateScoreFont(0);
+        return true;
+      }
+    } catch (e) {
+      console.error("Failed to parse editor level from sessionStorage:", e);
+    }
+  }
   return false;
 }
 
@@ -792,22 +785,22 @@ const keys = { x: false, z: false };
 
 document.addEventListener("keydown", (e) => {
   startBackgroundMusic();
-  if (e.key.toLowerCase() === "x") {
+  if (e.key.toLowerCase() === "x" || e.key === "ArrowRight") {
     keys.x = true;
     btnX?.classList.add("active");
   }
-  if (e.key.toLowerCase() === "z") {
+  if (e.key.toLowerCase() === "z" || e.key === "ArrowLeft") {
     keys.z = true;
     btnZ?.classList.add("active");
   }
 });
 
 document.addEventListener("keyup", (e) => {
-  if (e.key.toLowerCase() === "x") {
+  if (e.key.toLowerCase() === "x" || e.key === "ArrowRight") {
     keys.x = false;
     btnX?.classList.remove("active");
   }
-  if (e.key.toLowerCase() === "z") {
+  if (e.key.toLowerCase() === "z" || e.key === "ArrowLeft") {
     keys.z = false;
     btnZ?.classList.remove("active");
   }
@@ -873,6 +866,7 @@ function syncButtonVisuals() {
 // Restart game on key press when game over
 document.addEventListener("keydown", (e) => {
   if (isGameOver && e.key.toLowerCase() === " ") {
+    e.preventDefault();
     restartGame();
   }
 });
@@ -1433,6 +1427,14 @@ function restartGame() {
     updateTimerFont(TIME_ATTACK_DURATION);
   }
 
+  // Check for editor level in sessionStorage first
+  if (checkForEditorLevel()) {
+    if (controls && window.getComputedStyle(controls).display === "none") {
+      controls.style.display = "flex";
+    }
+    return;
+  }
+
   if (currentLevelName) {
     const levels = getStoredLevels();
     const level = levels.find((l) => l.name === currentLevelName);
@@ -1453,7 +1455,10 @@ function restartGame() {
 let lastFrameTime = performance.now();
 let physicsAccumulatedTime = 0;
 const PHYSICS_DT = 1000 / 60; // Physics runs at 60Hz = 16.67ms per step
-const MAX_PHYSICS_STEPS = 5; // Prevent spiral of death if tab was inactive
+const MAX_PHYSICS_STEPS = 2; // Prevent spiral of death if tab was inactive
+
+const isDebugMode =
+  new URLSearchParams(window.location.search).get("debug") === "1";
 
 // Debug counter for logging
 let debugFrameCounter = 0;
@@ -1470,6 +1475,10 @@ function gameLoop() {
   physicsAccumulatedTime += elapsed;
   let physicsSteps = 0;
 
+  if (physicsAccumulatedTime > 2000) {
+    physicsAccumulatedTime = 2000;
+  }
+
   while (
     physicsAccumulatedTime >= PHYSICS_DT &&
     physicsSteps < MAX_PHYSICS_STEPS
@@ -1478,16 +1487,18 @@ function gameLoop() {
     physicsAccumulatedTime -= PHYSICS_DT;
   }
 
-  // DEBUG: Log physics timing every 60 frames
-  debugFrameCounter++;
-  if (debugFrameCounter % 60 === 0) {
-    console.log(
-      `FPS: ${(1000 / elapsed).toFixed(
-        0,
-      )}, steps: ${physicsSteps}, accum: ${physicsAccumulatedTime.toFixed(
-        2,
-      )}ms`,
-    );
+  // DEBUG: Log physics timing every 60 frames (only when debug=1 is in URL)
+  if (isDebugMode) {
+    debugFrameCounter++;
+    if (debugFrameCounter % 60 === 0) {
+      console.log(
+        `FPS: ${(1000 / elapsed).toFixed(
+          0,
+        )}, steps: ${physicsSteps}, accum: ${physicsAccumulatedTime.toFixed(
+          2,
+        )}ms`,
+      );
+    }
   }
 
   // Sync button visuals with key state (handles iOS touch desync issues)
@@ -1566,13 +1577,10 @@ function gameLoop() {
     drawAttractors();
     drawTargets(Date.now());
     drawParticles();
-    drawPlayer(0); // No interpolation needed when game is over
-    // Show game over overlay
+    drawPlayer(0);
     drawGameOver();
   } else {
-    // Hide game over overlay when not in game over state
     hideGameOver();
-    // Update timer
     updateTimer();
 
     // Run physics multiple times to maintain consistent speed across frame rates
@@ -1582,14 +1590,10 @@ function gameLoop() {
       updatePlayer();
       checkCollisions();
     }
-    // Particles don't affect gameplay, update once per render frame
     updateParticles();
 
-    // Calculate interpolation factor for smooth rendering (0.0 to 1.0)
-    // Shows how far we are between physics steps
     const interpolationFactor = physicsAccumulatedTime / PHYSICS_DT;
 
-    // Draw everything
     drawWalls();
     drawAttractionLines();
     drawAttractors();
@@ -1606,15 +1610,13 @@ async function initializeGame(): Promise<void> {
   // Check for level from editor first
   if (!checkForEditorLevel()) {
     loadDefaultLevel();
+  } else {
+    if (controls && window.getComputedStyle(controls).display === "none") {
+      controls.style.display = "flex";
+    }
   }
 
-  // Populate level selector
-  populateLevelSelector();
-
-  // Start background ambiance
   playNextBgTrack();
-
-  // Start the game loop
   gameLoop();
 }
 

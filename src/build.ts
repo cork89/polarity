@@ -1,6 +1,6 @@
 export {};
 Bun.build({
-  entrypoints: ["editor.html", "play.html", "splash.html"],
+  entrypoints: ["editor.html", "play.html", "splash.html", "lore.html"],
   outdir: "../dist",
   sourcemap: "inline",
   external: [

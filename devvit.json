@@ -13,6 +13,9 @@
       },
       "editor": {
         "entry": "editor.html"
+      },
+      "lore": {
+        "entry": "lore.html"
       }
     }
   },

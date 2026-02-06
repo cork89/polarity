@@ -5,6 +5,8 @@ const arcCount = 60;
 const speedMult = 0.1;
 
 function createSwirl() {
+  if (!svg) return;
+
   for (let i = 0; i < arcCount; i++) {
     const isRed = i % 2 === 0;
     const color = isRed ? "#ff1e5677" : "#002c9a77";
@@ -59,6 +61,9 @@ function initSplash() {
   });
   document.getElementById("editor")?.addEventListener("click", (e) => {
     requestExpandedMode(e, "editor");
+  });
+  document.getElementById("lore")?.addEventListener("click", (e) => {
+    requestExpandedMode(e, "lore");
   });
 }
 

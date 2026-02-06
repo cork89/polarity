@@ -379,7 +379,7 @@ function updateValidationUI() {
     // Add pulsing glow to the stage with validation error
     if (validation.error && validation.error.startsWith("Stage ")) {
       const match = validation.error.match(/Stage (\d+)/);
-      if (match) {
+      if (match && match[1]) {
         const stageNum = parseInt(match[1], 10);
         const stageBtn = document.querySelector(
           `.stage-btn[data-stage="${stageNum - 1}"]`,

@@ -95,6 +95,7 @@
       .score-display,
       .timer-display {
         display: flex;
+        flex-direction: column;
         align-items: center;
         gap: 10px;
         margin-bottom: 10px;
@@ -125,9 +126,9 @@
         text-shadow: 0 0 10px var(--neon-cyan-glow);
       }
       .controls {
-        display: flex;
+        display: none;
         gap: 15px;
-        margin-bottom: 15px;
+        margin-top: 15px;
         align-items: center;
       }
       .level-select {
@@ -177,6 +178,8 @@
         align-items: center;
         justify-content: center;
         min-width: 44px;
+        align-self: flex-end;
+        margin-bottom: 10px;
       }
 
       .mute-button:hover {
@@ -209,7 +212,7 @@
       /* Arcade buttons container */
       .arcade-buttons {
         position: absolute;
-        bottom: -40px;
+        bottom: -60px;
         left: 0;
         right: 0;
         display: flex;
@@ -352,10 +355,26 @@
     </style>
   </head>
   <body>
-    <div class="controls">
-      <select class="level-select" id="levelSelect">
-        <option value="">-- Random Level --</option>
-      </select>
+    <div class="controls" id="controls">
+      <a href="editor.html" class="editor-link">Open Level Editor</a>
+    </div>
+    <div
+      style="
+        display: flex;
+        gap: 15px;
+        margin-bottom: 10px;
+        align-items: center;
+        margin-top: 10px;
+      "
+    >
+      <div class="timer-display">
+        <span class="timer-label">TIME</span>
+        <span id="timerFont" class="font-seven-segment"> 30</span>
+      </div>
+      <div class="score-display">
+        <span class="score-label">SCORE</span>
+        <span id="scoreFont" class="font-seven-segment"> 0</span>
+      </div>
       <button class="mute-button" id="muteButton" aria-label="Toggle sound">
         <svg
           id="audioPlayingIcon"
@@ -379,27 +398,16 @@
           ></path>
         </svg>
       </button>
-      <a href="editor.html" class="editor-link">Open Level Editor</a>
-    </div>
-    <div
-      style="display: flex; gap: 15px; margin-bottom: 10px; align-items: center"
-    >
-      <div class="timer-display">
-        <span class="timer-label">TIME</span>
-        <span id="timerFont" class="font-seven-segment"> 30</span>
-      </div>
-      <div class="score-display">
-        <span class="score-label">SCORE</span>
-        <span id="scoreFont" class="font-seven-segment"> 0</span>
-      </div>
     </div>
     <div class="game-container">
       <canvas id="gameCanvas" width="360" height="360"></canvas>
       <div class="game-over-overlay" id="gameOverOverlay">
         <div class="game-over-title" id="gameOverTitle">GAME OVER</div>
         <div class="game-over-score" id="gameOverScore">Points earned: 0</div>
-        <div class="game-over-hint">Press SPACE to play again</div>
-        <button class="game-over-button" id="gameOverButton">Play Again</button>
+        <!-- <div class="game-over-hint">Press SPACE to play again</div> -->
+        <button class="game-over-button" id="gameOverButton">
+          Play Again <span class="key">_</span>
+        </button>
       </div>
       <div class="arcade-buttons">
         <button
@@ -407,21 +415,21 @@
           id="btnZ"
           aria-label="Attract to blue squares"
         >
-          <span class="button-label">Z</span>
+          <span class="button-label">&lt;</span>
         </button>
         <button
           class="arcade-button red"
           id="btnX"
           aria-label="Attract to red squares"
         >
-          <span class="button-label">X</span>
+          <span class="button-label">&gt;</span>
         </button>
       </div>
     </div>
     <div class="instructions">
-      <p>Press <span class="key">X</span> to attract to RED squares</p>
-      <p>Press <span class="key">Z</span> to attract to BLUE squares</p>
-      <p>Hit GREEN squares to score!</p>
+      <p><span class="key">&gt;</span> attracts RED</p>
+      <p><span class="key">&lt;</span> attracts BLUE</p>
+      <p>Eat fish to score!</p>
     </div>
 
     <script type="module" src="play.ts"></script>
