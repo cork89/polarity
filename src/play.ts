@@ -71,8 +71,7 @@ const TARGET_SIZE = 22;
 const ATTRACTOR_SIZE = 22;
 const GRAVITY = 0.0625;
 
-// Physics speed multiplier - INCREASE this if game is too slow, DECREASE if too fast
-// 1.0 = original speed, 2.0 = twice as fast, 0.5 = half speed
+// Physics speed multiplier
 const PHYSICS_SPEED = 2.0;
 
 // Game modes
@@ -137,13 +136,13 @@ interface StageData {
   targets: { x: number; y: number }[];
 }
 
-// Level data interface (supports both old single-grid and new multi-stage formats)
+// Level data interface
 interface LevelData {
   name: string;
   gameMode?: "timeAttack" | "sprint" | "staged";
-  grid?: string[][]; // Old format
-  baseGrid?: string[][]; // New format - base layout (player, magnets, walls)
-  stages?: StageData[]; // New format - array of stages with targets
+  grid?: string[][];
+  baseGrid?: string[][];
+  stages?: StageData[];
 }
 
 // Type definitions
@@ -187,7 +186,6 @@ interface Player {
   size: number;
   trail: TrailPoint[];
   hasAttracted: boolean;
-  // Previous position for interpolation (smooths high refresh rate displays)
   prevX: number;
   prevY: number;
 }
@@ -307,20 +305,130 @@ let currentLevelData: LevelData | null = null;
 let currentPlayStageIndex = 0;
 let totalStages = 0;
 
-// Sound effects
-const blueSound = new Audio("electric1.ogg");
-const redSound = new Audio("electric2.ogg");
-const collectSound = new Audio("eat.ogg");
-blueSound.loop = true;
-redSound.loop = true;
-blueSound.volume = 0.3;
-redSound.volume = 0.3;
-collectSound.volume = 0.3;
+// ── Web Audio API sound system (fixes iOS latency) ──────────────
+const audioCtx = new (window.AudioContext ||
+  (window as any).webkitAudioContext)();
+const audioBuffers: Map<string, AudioBuffer> = new Map();
 
-// Preload audio files to ensure they're ready
-blueSound.preload = "auto";
-redSound.preload = "auto";
-collectSound.preload = "auto";
+// Master gain node for muting
+const masterGain = audioCtx.createGain();
+masterGain.connect(audioCtx.destination);
+
+async function loadAudioBuffer(url: string): Promise<AudioBuffer> {
+  // Try original format, fall back to mp3
+  try {
+    const response = await fetch(url);
+    const arrayBuffer = await response.arrayBuffer();
+    return await audioCtx.decodeAudioData(arrayBuffer);
+  } catch {
+    const mp3Url = url.replace(/\.ogg$/, ".mp3");
+    const response = await fetch(mp3Url);
+    const arrayBuffer = await response.arrayBuffer();
+    return await audioCtx.decodeAudioData(arrayBuffer);
+  }
+}
+async function preloadSounds(): Promise<void> {
+  const soundFiles = ["electric1.ogg", "electric2.ogg", "eat.ogg"];
+
+  await Promise.all(
+    soundFiles.map(async (file) => {
+      try {
+        const buffer = await loadAudioBuffer(file);
+        audioBuffers.set(file, buffer);
+      } catch (err) {
+        console.warn(`Failed to preload ${file}:`, err);
+      }
+    }),
+  );
+}
+
+// Play a one-shot sound effect
+function playSfx(
+  fileName: string,
+  volume: number = 0.3,
+): AudioBufferSourceNode | null {
+  const buffer = audioBuffers.get(fileName);
+  if (!buffer) return null;
+
+  const source = audioCtx.createBufferSource();
+  const gainNode = audioCtx.createGain();
+  gainNode.gain.value = volume;
+
+  source.buffer = buffer;
+  source.connect(gainNode);
+  gainNode.connect(masterGain);
+  source.start(0);
+
+  return source;
+}
+
+// Looping sound management for magnet effects
+interface LoopingSound {
+  source: AudioBufferSourceNode | null;
+  gain: GainNode;
+  playing: boolean;
+}
+
+function createLoopingSound(): LoopingSound {
+  const gain = audioCtx.createGain();
+  gain.gain.value = 0;
+  gain.connect(masterGain);
+  return { source: null, gain, playing: false };
+}
+
+const blueLoop = createLoopingSound();
+const redLoop = createLoopingSound();
+
+const FADE_DURATION = 150;
+const MAX_VOLUME = 0.2;
+
+function startLoop(loop: LoopingSound, fileName: string, volume: number): void {
+  if (loop.playing) return;
+
+  const buffer = audioBuffers.get(fileName);
+  if (!buffer) return;
+
+  const source = audioCtx.createBufferSource();
+  source.buffer = buffer;
+  source.loop = true;
+  source.connect(loop.gain);
+  loop.gain.gain.setTargetAtTime(volume, audioCtx.currentTime, 0.01);
+  source.start(0);
+
+  loop.source = source;
+  loop.playing = true;
+}
+
+function stopLoop(loop: LoopingSound): void {
+  if (!loop.playing) return;
+
+  // Quick fade out to avoid click
+  loop.gain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.05);
+
+  const source = loop.source;
+  setTimeout(() => {
+    try {
+      source?.stop();
+    } catch (_) {
+      // Already stopped
+    }
+  }, FADE_DURATION);
+
+  loop.source = null;
+  loop.playing = false;
+}
+
+// iOS requires AudioContext resume on user gesture
+function unlockAudioContext(): void {
+  if (audioCtx.state === "suspended") {
+    audioCtx.resume();
+  }
+}
+
+document.addEventListener("touchstart", unlockAudioContext, { once: false });
+document.addEventListener("touchend", unlockAudioContext, { once: false });
+document.addEventListener("mousedown", unlockAudioContext, { once: false });
+document.addEventListener("keydown", unlockAudioContext, { once: false });
 
 // Background ambiance - plays synth1.ogg and synth2.ogg serially
 const bgSynth1 = new Audio("synth1.ogg");
@@ -331,18 +439,16 @@ let currentBgTrack: 1 | 2 = 1;
 let bgMusicStarted = false;
 
 // Mute toggle functionality
-const allSounds = [blueSound, redSound, collectSound, bgSynth1, bgSynth2];
-
 function toggleMute(): void {
   isMuted = !isMuted;
-
-  // Save to sessionStorage
   sessionStorage.setItem("polarity_mute_state", String(isMuted));
 
-  // Update all sound volumes
-  for (const sound of allSounds) {
-    sound.muted = isMuted;
-  }
+  // Mute/unmute via Web Audio master gain
+  masterGain.gain.value = isMuted ? 0 : 1;
+
+  // Also mute background music (still using HTML Audio)
+  bgSynth1.muted = isMuted;
+  bgSynth2.muted = isMuted;
 
   // Update button appearance
   if (muteButton) {
@@ -364,10 +470,12 @@ if (muteButton) {
 
 // Initialize mute button appearance from sessionStorage
 function initializeMuteState(): void {
-  // Apply mute state to sounds
-  for (const sound of allSounds) {
-    sound.muted = isMuted;
-  }
+  // Apply mute state to Web Audio master gain
+  masterGain.gain.value = isMuted ? 0 : 1;
+
+  // Apply mute state to background music
+  bgSynth1.muted = isMuted;
+  bgSynth2.muted = isMuted;
 
   // Update button appearance
   if (muteButton) {
@@ -388,12 +496,12 @@ initializeMuteState();
 function playNextBgTrack(): void {
   if (currentBgTrack === 1) {
     bgSynth1.currentTime = 0;
-    bgSynth1.play().catch((err) => {
+    bgSynth1.play().catch(() => {
       console.log("BG music autoplay blocked, will try on user interaction");
     });
   } else {
     bgSynth2.currentTime = 0;
-    bgSynth2.play().catch((err) => {
+    bgSynth2.play().catch(() => {
       console.log("BG music autoplay blocked, will try on user interaction");
     });
   }
@@ -416,32 +524,51 @@ bgSynth2.addEventListener("ended", () => {
   playNextBgTrack();
 });
 
-// Sound fade out tracking
-const FADE_DURATION = 150; // milliseconds to fade out
-const MAX_VOLUME = 0.2;
-let blueFadeStartTime: number | null = null;
-let redFadeStartTime: number | null = null;
+// Visibility change handler - pause audio when screen off / tab hidden
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    // Suspend Web Audio context (stops all sfx loops)
+    audioCtx.suspend();
 
-function fadeAudio(
-  sound: HTMLAudioElement,
-  fadeStartTime: number | null,
-  currentTime: number,
-): number | null {
-  if (fadeStartTime === null) return null;
+    // Pause background music
+    bgSynth1.pause();
+    bgSynth2.pause();
 
-  const elapsed = currentTime - fadeStartTime;
-  const progress = Math.min(elapsed / FADE_DURATION, 1);
+    // Stop any active loops cleanly
+    if (blueLoop.playing) {
+      blueLoop.playing = false;
+      try {
+        blueLoop.source?.stop();
+      } catch (_) {}
+      blueLoop.source = null;
+    }
+    if (redLoop.playing) {
+      redLoop.playing = false;
+      try {
+        redLoop.source?.stop();
+      } catch (_) {}
+      redLoop.source = null;
+    }
 
-  sound.volume = MAX_VOLUME * (1 - progress);
+    // Reset physics timing to prevent huge delta catch-up
+    lastFrameTime = performance.now();
+    physicsAccumulatedTime = 0;
+    lastTimerUpdate = Date.now();
+  } else {
+    // Resume Web Audio context
+    audioCtx.resume();
 
-  if (progress >= 1) {
-    sound.pause();
-    sound.volume = MAX_VOLUME;
-    return null;
+    // Resume background music
+    if (bgMusicStarted) {
+      playNextBgTrack();
+    }
+
+    // Reset physics timing
+    lastFrameTime = performance.now();
+    physicsAccumulatedTime = 0;
+    lastTimerUpdate = Date.now();
   }
-
-  return fadeStartTime;
-}
+});
 
 // Convert grid coordinates to pixel coordinates
 function playGridToPixel(
@@ -497,27 +624,22 @@ function parseGrid(grid: string[][]) {
   return { playerX, playerY, reds, blues, targs, wallList };
 }
 
-// Normalize level data - convert both old and new formats to a usable grid
-// For multi-stage levels, merges baseGrid with current stage targets
+// Normalize level data
 function normalizeLevelData(
   levelData: LevelData,
   stageIndex: number = 0,
 ): string[][] | null {
-  // Old format: just return the grid
   if (levelData.grid) {
     return levelData.grid;
   }
 
-  // New format: merge baseGrid with stage targets
   if (levelData.baseGrid && levelData.stages && levelData.stages.length > 0) {
     const baseGrid = levelData.baseGrid;
     const stage = levelData.stages[stageIndex];
     if (!stage) return null;
 
-    // Create a copy of baseGrid
     const mergedGrid: string[][] = baseGrid.map((row) => [...row]);
 
-    // Add targets from this stage
     for (const target of stage.targets) {
       const y = target.y;
       const x = target.x;
@@ -548,22 +670,18 @@ function loadLevel(
   stageIndex: number = 0,
   resetState: boolean = true,
 ) {
-  // Store level data for stage progression
   currentLevelData = levelData;
   currentPlayStageIndex = stageIndex;
   totalStages = levelData.stages?.length || 1;
 
-  // Set game mode from level (default to staged for backward compatibility)
   currentGameMode = levelData.gameMode || "staged";
 
-  // Normalize level data to a grid
   const grid = normalizeLevelData(levelData, stageIndex);
   if (!grid) {
     console.error("Failed to load level: invalid level data");
     return;
   }
 
-  // Reset game state on initial load, preserve on stage progression
   if (resetState) {
     score = 0;
     updateScoreFont(0);
@@ -584,22 +702,18 @@ function loadLevel(
   particles = [];
   player.hasAttracted = false;
 
-  // Parse the grid
   const { playerX, playerY, reds, blues, targs, wallList } = parseGrid(grid);
 
-  // Only set player position on initial load, not stage progression
   if (resetState) {
     const playerOffset = (PLAY_CELL_SIZE - PLAYER_SIZE) / 2;
     player.x = playerX * PLAY_CELL_SIZE + playerOffset;
     player.y = playerY * PLAY_CELL_SIZE + playerOffset;
   }
 
-  // Load attractors, targets, and walls
   redAttractors = reds;
   blueAttractors = blues;
   walls = wallList;
 
-  // For timeAttack and sprint, auto-generate targets instead of using level targets
   if (currentGameMode === "timeAttack" || currentGameMode === "sprint") {
     spawnRandomTargets();
   } else {
@@ -611,7 +725,6 @@ function loadLevel(
 
 // Check if target position overlaps with a wall or magnet
 function isValidTargetPosition(x: number, y: number): boolean {
-  // Check walls
   for (const wall of walls) {
     if (
       x < wall.x + PLAY_CELL_SIZE &&
@@ -623,7 +736,6 @@ function isValidTargetPosition(x: number, y: number): boolean {
     }
   }
 
-  // Check red attractors
   for (const attractor of redAttractors) {
     if (
       x < attractor.x + ATTRACTOR_SIZE &&
@@ -635,7 +747,6 @@ function isValidTargetPosition(x: number, y: number): boolean {
     }
   }
 
-  // Check blue attractors
   for (const attractor of blueAttractors) {
     if (
       x < attractor.x + ATTRACTOR_SIZE &&
@@ -650,10 +761,9 @@ function isValidTargetPosition(x: number, y: number): boolean {
   return true;
 }
 
-// Spawn random targets (fallback for no level)
+// Spawn random targets
 function spawnRandomTargets() {
   targets = [];
-  // Spawn green squares along the right edge
   for (let i = 0; i < PLAY_GRID_SIZE; i++) {
     if (Math.random() > 0.5) {
       const targetX = PLAY_CELL_SIZE * 5 + (PLAY_CELL_SIZE - TARGET_SIZE) / 2;
@@ -668,7 +778,6 @@ function spawnRandomTargets() {
       }
     }
   }
-  // Also spawn some elsewhere
   for (let i = 0; i < 3; i++) {
     const gridX = Math.floor(Math.random() * 4);
     const gridY = Math.floor(Math.random() * PLAY_GRID_SIZE);
@@ -685,7 +794,7 @@ function spawnRandomTargets() {
   }
 }
 
-// Default level (original game setup)
+// Default level
 function loadDefaultLevel() {
   redAttractors = [
     {
@@ -708,7 +817,6 @@ function loadDefaultLevel() {
   player.trail = [];
   player.hasAttracted = false;
 
-  // Reset timer and game state based on current mode
   if (currentGameMode === "sprint" || currentGameMode === "staged") {
     sprintTimeElapsed = 0;
     updateTimerFont(0);
@@ -724,7 +832,6 @@ function loadDefaultLevel() {
 
 // Load levels from localStorage
 function getStoredLevels(): LevelData[] {
-  // Try new format first
   const stored = localStorage.getItem("polarity_levels_v2");
   if (stored) {
     try {
@@ -742,20 +849,18 @@ function getLevelDisplayName(level: LevelData): string {
   return `${level.name} ${modeTag}`;
 }
 
-// Check for level in URL hash (from editor "Test in Game")
+// Check for level in URL hash
 function checkForEditorLevel() {
-  const hash = window.location.hash.slice(1); // Remove #
+  const hash = window.location.hash.slice(1);
   if (hash) {
     try {
       const decoded = decodeURIComponent(hash);
       const data = JSON.parse(decoded);
-      // Support both old format (level.grid) and new multi-stage format (level.baseGrid + level.stages)
       if (
         data.level &&
         (data.level.grid || (data.level.baseGrid && data.level.stages))
       ) {
         loadLevel(data.level);
-        // Remove hash to prevent reloading on refresh
         history.replaceState(null, "", window.location.pathname);
         return true;
       }
@@ -824,12 +929,10 @@ function setupArcadeButton(button: HTMLElement | null, key: "z" | "x") {
     keys[key] = false;
   };
 
-  // Mouse events
   button.addEventListener("mousedown", startHandler);
   button.addEventListener("mouseup", endHandler);
   button.addEventListener("mouseleave", endHandler);
 
-  // Touch events
   button.addEventListener("touchstart", startHandler, { passive: false });
   button.addEventListener("touchend", endHandler, { passive: false });
   button.addEventListener("touchcancel", endHandler, { passive: false });
@@ -838,13 +941,11 @@ function setupArcadeButton(button: HTMLElement | null, key: "z" | "x") {
 setupArcadeButton(btnZ, "z");
 setupArcadeButton(btnX, "x");
 
-// Sync button visual state with keys object (called every frame)
-// Track previous button states to avoid unnecessary DOM updates
+// Sync button visual state with keys object
 let lastZActive = false;
 let lastXActive = false;
 
 function syncButtonVisuals() {
-  // Only update DOM if state actually changed (reduces iOS jitter)
   if (btnZ && keys.z !== lastZActive) {
     lastZActive = keys.z;
     if (keys.z) {
@@ -906,7 +1007,6 @@ function applyAttraction() {
   const playerCenterX = player.x + player.size / 2;
   const playerCenterY = player.y + player.size / 2;
 
-  // Only attract to closest red attractor
   if (keys.x) {
     const closestRed = getClosestAttractor(redAttractors);
     if (closestRed) {
@@ -925,7 +1025,6 @@ function applyAttraction() {
     }
   }
 
-  // Only attract to closest blue attractor
   if (keys.z) {
     const closestBlue = getClosestAttractor(blueAttractors);
     if (closestBlue) {
@@ -946,11 +1045,9 @@ function applyAttraction() {
 }
 
 function updatePlayer() {
-  // Store previous position for interpolation (smooths high refresh rate displays)
   player.prevX = player.x;
   player.prevY = player.y;
 
-  // Apply gravity only after first attraction and when not currently attracting
   const isAttracting = keys.x || keys.z;
   if (isAttracting) {
     player.hasAttracted = true;
@@ -959,11 +1056,9 @@ function updatePlayer() {
     player.vy += GRAVITY * PHYSICS_SPEED;
   }
 
-  // Update position
   player.x += player.vx * PHYSICS_SPEED;
   player.y += player.vy * PHYSICS_SPEED;
 
-  // Boundary collision - stop at boundaries without bouncing
   if (player.x < 0) {
     player.x = 0;
     player.vx = 0;
@@ -981,26 +1076,21 @@ function updatePlayer() {
     player.vy = 0;
   }
 
-  // Wall collision - stop player from passing through walls
   walls.forEach((wall) => {
-    // Cache wall properties to avoid repeated property access
     const wallX = wall.x;
     const wallY = wall.y;
 
-    // Check if player intersects with wall
     if (
       player.x < wallX + PLAY_CELL_SIZE &&
       player.x + player.size > wallX &&
       player.y < wallY + PLAY_CELL_SIZE &&
       player.y + player.size > wallY
     ) {
-      // Determine which side of the wall the player hit
       const overlapLeft = player.x + player.size - wallX;
       const overlapRight = wallX + PLAY_CELL_SIZE - player.x;
       const overlapTop = player.y + player.size - wallY;
       const overlapBottom = wallY + PLAY_CELL_SIZE - player.y;
 
-      // Find the smallest overlap
       const minOverlap = Math.min(
         overlapLeft,
         overlapRight,
@@ -1008,7 +1098,6 @@ function updatePlayer() {
         overlapBottom,
       );
 
-      // Push player out based on smallest overlap
       if (minOverlap === overlapLeft) {
         player.x = wallX - player.size;
         player.vx = 0;
@@ -1025,7 +1114,6 @@ function updatePlayer() {
     }
   });
 
-  // Trail effect using pool
   player.trail.push(trailPool.acquire(player.x, player.y, 1));
   if (player.trail.length > TRAIL_MAX_LENGTH) player.trail.shift();
   player.trail.forEach((t) => (t.alpha *= TRAIL_FADE_RATE));
@@ -1044,18 +1132,13 @@ function checkCollisions() {
         score += 10;
         updateScoreFont(score);
 
-        // Play collection sound
-        collectSound.currentTime = 0;
-        collectSound
-          .play()
-          .catch((err) => console.error("Failed to play collect sound:", err));
+        // Play collection sound via Web Audio API
+        playSfx("eat.ogg", 0.3);
 
-        // Check for Sprint mode win condition
         if (currentGameMode === "sprint" && score >= SPRINT_TARGET_SCORE) {
           isGameOver = true;
         }
 
-        // Check for Staged mode - all targets collected in all stages
         if (currentGameMode === "staged") {
           const allTargetsInCurrentStageCollected = targets.every(
             (t) => t.collected,
@@ -1068,7 +1151,6 @@ function checkCollisions() {
           }
         }
 
-        // Create particles using pool
         for (let i = 0; i < PARTICLE_COUNT_ON_COLLECT; i++) {
           particles.push(
             particlePool.acquire(
@@ -1085,9 +1167,7 @@ function checkCollisions() {
     }
   });
 
-  // Check if all targets collected
   if (targets.every((t) => t.collected)) {
-    // Respawn random targets for timeAttack/sprint modes or default/random mode
     if (
       !currentLevelName ||
       currentGameMode === "timeAttack" ||
@@ -1099,11 +1179,9 @@ function checkCollisions() {
       currentLevelData.stages &&
       currentPlayStageIndex < totalStages - 1
     ) {
-      // Multi-stage level: advance to next stage (keep player position)
       currentPlayStageIndex++;
       loadLevel(currentLevelData, currentPlayStageIndex, false);
     } else if (currentGameMode === "staged") {
-      // Staged mode: all targets collected in final stage (or single-stage level)
       isGameOver = true;
     }
   }
@@ -1126,7 +1204,6 @@ function updateParticles(): void {
 
 // Drawing functions
 function drawGrid() {
-  // Add glow effect for tron aesthetic
   gameCtx.shadowColor = COLOR_GRID;
   gameCtx.shadowBlur = 8;
   gameCtx.strokeStyle = COLOR_GRID;
@@ -1144,15 +1221,12 @@ function drawGrid() {
     gameCtx.stroke();
   }
 
-  // Reset shadow for other elements
   gameCtx.shadowBlur = 0;
 }
 
 function drawAttractors() {
-  // Red attractors
   redAttractors.forEach((a) => {
     if (redAttractorImageLoaded) {
-      // Add glow behind the image
       gameCtx.shadowColor = COLOR_RED_ATTRACTOR_OUTER;
       gameCtx.shadowBlur = 12;
       gameCtx.drawImage(
@@ -1164,12 +1238,10 @@ function drawAttractors() {
       );
       gameCtx.shadowBlur = 0;
     } else {
-      // Fallback to rectangle drawing with glow
       gameCtx.shadowColor = COLOR_RED_ATTRACTOR_OUTER;
       gameCtx.shadowBlur = 12;
       gameCtx.fillStyle = COLOR_RED_ATTRACTOR_OUTER;
       gameCtx.fillRect(a.x, a.y, ATTRACTOR_SIZE, ATTRACTOR_SIZE);
-      // Inner detail
       gameCtx.shadowBlur = 0;
       gameCtx.fillStyle = COLOR_RED_ATTRACTOR_INNER;
       gameCtx.fillRect(
@@ -1181,10 +1253,8 @@ function drawAttractors() {
     }
   });
 
-  // Blue attractors
   blueAttractors.forEach((a) => {
     if (blueAttractorImageLoaded) {
-      // Add glow behind the image
       gameCtx.shadowColor = COLOR_BLUE_ATTRACTOR_OUTER;
       gameCtx.shadowBlur = 12;
       gameCtx.drawImage(
@@ -1196,12 +1266,10 @@ function drawAttractors() {
       );
       gameCtx.shadowBlur = 0;
     } else {
-      // Fallback to rectangle drawing with glow
       gameCtx.shadowColor = COLOR_BLUE_ATTRACTOR_OUTER;
       gameCtx.shadowBlur = 12;
       gameCtx.fillStyle = COLOR_BLUE_ATTRACTOR_OUTER;
       gameCtx.fillRect(a.x, a.y, ATTRACTOR_SIZE, ATTRACTOR_SIZE);
-      // Inner detail
       gameCtx.shadowBlur = 0;
       gameCtx.fillStyle = COLOR_BLUE_ATTRACTOR_INNER;
       gameCtx.fillRect(
@@ -1217,18 +1285,15 @@ function drawAttractors() {
 function drawTargets(time: number) {
   targets.forEach((t) => {
     if (!t.collected) {
-      // Calculate rotation - gentle wiggle like swimming
       const rotation =
         Math.sin(time * TARGET_SWIM_SPEED + t.rotationOffset) *
         MAX_TARGET_ROTATION;
 
-      // Save context and translate to center of target
       gameCtx.save();
       gameCtx.translate(t.x + TARGET_SIZE / 2, t.y + TARGET_SIZE / 2);
       gameCtx.rotate(rotation);
 
       if (targetImageLoaded) {
-        // Add glow behind the image
         gameCtx.shadowColor = COLOR_TARGET_OUTER;
         gameCtx.shadowBlur = 10;
         gameCtx.drawImage(
@@ -1240,7 +1305,6 @@ function drawTargets(time: number) {
         );
         gameCtx.shadowBlur = 0;
       } else {
-        // Fallback to rectangle drawing with glow
         gameCtx.shadowColor = COLOR_TARGET_OUTER;
         gameCtx.shadowBlur = 10;
         gameCtx.fillStyle = COLOR_TARGET_OUTER;
@@ -1250,7 +1314,6 @@ function drawTargets(time: number) {
           TARGET_SIZE,
           TARGET_SIZE,
         );
-        // Inner detail
         gameCtx.shadowBlur = 0;
         gameCtx.fillStyle = COLOR_TARGET_INNER;
         gameCtx.fillRect(
@@ -1270,7 +1333,6 @@ function drawWalls() {
   walls.forEach((w) => {
     gameCtx.fillStyle = COLOR_WALL_OUTER;
     gameCtx.fillRect(w.x, w.y, PLAY_CELL_SIZE, PLAY_CELL_SIZE);
-    // Inner detail
     gameCtx.fillStyle = COLOR_WALL_INNER;
     gameCtx.fillRect(
       w.x + WALL_DETAIL_INSET,
@@ -1282,14 +1344,11 @@ function drawWalls() {
 }
 
 function drawPlayer(interpolationFactor: number = 0) {
-  // Calculate interpolated position for smooth rendering at high refresh rates
-  // interpolationFactor is 0.0 to 1.0 representing how far between physics steps
   const renderX =
     player.prevX + (player.x - player.prevX) * interpolationFactor;
   const renderY =
     player.prevY + (player.y - player.prevY) * interpolationFactor;
 
-  // Draw trail - narrower to avoid showing through transparent sides of penguin image
   const trailWidth = player.size * TRAIL_WIDTH_RATIO;
   const trailOffsetX = (player.size - trailWidth) / 2;
   player.trail.forEach((t) => {
@@ -1297,16 +1356,12 @@ function drawPlayer(interpolationFactor: number = 0) {
     gameCtx.fillRect(t.x + trailOffsetX, t.y, trailWidth, player.size);
   });
 
-  // Draw player image (or fallback to rectangle if not loaded)
   if (playerImageLoaded) {
-    // Calculate rotation based on horizontal velocity (tilt left/right)
     const tilt = Math.max(
       -MAX_PLAYER_TILT,
       Math.min(MAX_PLAYER_TILT, player.vx * PLAYER_TILT_FACTOR),
     );
 
-    // Save context, translate to center, rotate, draw, restore
-    // Hitbox remains unchanged - only visual rotation
     gameCtx.save();
     gameCtx.translate(renderX + player.size / 2, renderY + player.size / 2);
     gameCtx.rotate(tilt);
@@ -1319,7 +1374,6 @@ function drawPlayer(interpolationFactor: number = 0) {
     );
     gameCtx.restore();
   } else {
-    // Fallback to rectangle drawing
     gameCtx.fillStyle = COLOR_PLAYER_OUTER;
     gameCtx.fillRect(renderX, renderY, player.size, player.size);
     gameCtx.fillStyle = COLOR_PLAYER_INNER;
@@ -1409,7 +1463,6 @@ function drawGameOver() {
   }
 }
 
-// Hide game over overlay
 function hideGameOver() {
   gameOverOverlay.classList.remove("visible");
 }
@@ -1427,7 +1480,6 @@ function restartGame() {
     updateTimerFont(TIME_ATTACK_DURATION);
   }
 
-  // Check for editor level in sessionStorage first
   if (checkForEditorLevel()) {
     if (controls && window.getComputedStyle(controls).display === "none") {
       controls.style.display = "flex";
@@ -1454,24 +1506,20 @@ function restartGame() {
 // Frame-rate independent physics tracking
 let lastFrameTime = performance.now();
 let physicsAccumulatedTime = 0;
-const PHYSICS_DT = 1000 / 60; // Physics runs at 60Hz = 16.67ms per step
-const MAX_PHYSICS_STEPS = 2; // Prevent spiral of death if tab was inactive
+const PHYSICS_DT = 1000 / 60;
+const MAX_PHYSICS_STEPS = 2;
 
 const isDebugMode =
   new URLSearchParams(window.location.search).get("debug") === "1";
 
-// Debug counter for logging
 let debugFrameCounter = 0;
 
 // Main game loop
 function gameLoop() {
-  // Calculate how many physics steps to run based on elapsed time
   const currentTime = performance.now();
   const elapsed = currentTime - lastFrameTime;
   lastFrameTime = currentTime;
 
-  // Accumulate time and calculate physics steps
-  // At 60fps: 1 step/frame, At 30fps: 2 steps every 2nd frame, At 165fps: 1 step every ~2.75 frames
   physicsAccumulatedTime += elapsed;
   let physicsSteps = 0;
 
@@ -1487,7 +1535,6 @@ function gameLoop() {
     physicsAccumulatedTime -= PHYSICS_DT;
   }
 
-  // DEBUG: Log physics timing every 60 frames (only when debug=1 is in URL)
   if (isDebugMode) {
     debugFrameCounter++;
     if (debugFrameCounter % 60 === 0) {
@@ -1501,53 +1548,25 @@ function gameLoop() {
     }
   }
 
-  // Sync button visuals with key state (handles iOS touch desync issues)
   syncButtonVisuals();
 
-  // Update sound effects based on connection state
-  const now = Date.now();
-
+  // Update looping magnet sounds via Web Audio API
   if (!isGameOver) {
     if (keys.z) {
-      if (blueSound.paused) {
-        blueSound.volume = MAX_VOLUME;
-        blueSound
-          .play()
-          .catch((err) => console.error("Failed to play blue sound:", err));
-      }
-      blueFadeStartTime = null;
+      startLoop(blueLoop, "electric1.ogg", MAX_VOLUME);
     } else {
-      if (!blueSound.paused && blueFadeStartTime === null) {
-        blueFadeStartTime = now;
-      }
+      stopLoop(blueLoop);
     }
 
     if (keys.x) {
-      if (redSound.paused) {
-        redSound.volume = MAX_VOLUME;
-        redSound
-          .play()
-          .catch((err) => console.error("Failed to play red sound:", err));
-      }
-      redFadeStartTime = null;
+      startLoop(redLoop, "electric2.ogg", MAX_VOLUME);
     } else {
-      if (!redSound.paused && redFadeStartTime === null) {
-        redFadeStartTime = now;
-      }
+      stopLoop(redLoop);
     }
   } else {
-    // Start fade out when game is over
-    if (!blueSound.paused && blueFadeStartTime === null) {
-      blueFadeStartTime = now;
-    }
-    if (!redSound.paused && redFadeStartTime === null) {
-      redFadeStartTime = now;
-    }
+    stopLoop(blueLoop);
+    stopLoop(redLoop);
   }
-
-  // Apply fade out
-  blueFadeStartTime = fadeAudio(blueSound, blueFadeStartTime, now);
-  redFadeStartTime = fadeAudio(redSound, redFadeStartTime, now);
 
   // Clear canvas with underwater background
   gameCtx.fillStyle = COLOR_BACKGROUND;
@@ -1567,11 +1586,9 @@ function gameLoop() {
   gameCtx.fillStyle = gradient;
   gameCtx.fillRect(0, 0, gameCanvas.width, gameCanvas.height);
 
-  // Draw grid
   drawGrid();
 
   if (isGameOver) {
-    // Draw game state (frozen)
     drawWalls();
     drawAttractionLines();
     drawAttractors();
@@ -1583,8 +1600,6 @@ function gameLoop() {
     hideGameOver();
     updateTimer();
 
-    // Run physics multiple times to maintain consistent speed across frame rates
-    // At 60fps: 1 step per frame, At 30fps: 2 steps per frame
     for (let i = 0; i < physicsSteps; i++) {
       applyAttraction();
       updatePlayer();
@@ -1607,7 +1622,9 @@ function gameLoop() {
 
 // Initialize game
 async function initializeGame(): Promise<void> {
-  // Check for level from editor first
+  // Preload sound effects into Web Audio buffers
+  await preloadSounds();
+
   if (!checkForEditorLevel()) {
     loadDefaultLevel();
   } else {

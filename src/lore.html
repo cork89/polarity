@@ -11,19 +11,24 @@
       rel="stylesheet"
     />
     <style>
+      :root {
+        --border-color: #00d4ff;
+      }
+      body {
+        background-color: #131313;
+      }
       .floating-text-box {
-        /* position: absolute;
-        bottom: 30%; */
         padding: 20px 30px;
         background: rgba(0, 20, 40, 0.7);
-        border: 1px solid #00ffff;
+        border: 1px solid var(--border-color);
         border-radius: 12px;
         box-shadow: 0 0 20px rgba(0, 255, 255, 0.3),
           inset 0 0 20px rgba(0, 255, 255, 0.05);
         z-index: 4;
         margin: 0 auto;
-        width: 400px;
-        max-width: 100%;
+        width: 100%;
+        max-width: 400px;
+        box-sizing: border-box;
       }
 
       .floating-text-box p {
@@ -39,8 +44,8 @@
   <body>
     <div class="floating-text-box">
       <p>
-        They said Volt was wired wrong — a penguin whose polarity pulled him
-        everywhere but the water.
+        They said <span style="color: var(--border-color)">Volt</span> was wired
+        wrong — a penguin whose polarity pulled him everywhere but the water.
       </p>
       <p>
         While the others dove and feasted, he slipped, stumbled, and went
