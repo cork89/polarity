@@ -318,8 +318,21 @@
       .game-over-score {
         color: var(--text-color);
         font-size: 24px;
-        margin-bottom: 30px;
+        margin-bottom: 10px;
         text-shadow: 0 0 10px var(--neon-cyan-glow);
+      }
+
+      .game-over-target {
+        font-size: 20px;
+        margin-bottom: 10px;
+        text-shadow: 0 0 10px var(--neon-cyan-glow);
+      }
+
+      .game-over-attempts {
+        color: var(--text-color);
+        font-size: 18px;
+        margin-bottom: 30px;
+        text-shadow: 0 0 8px var(--neon-cyan-glow);
       }
 
       .game-over-hint {
@@ -404,6 +417,8 @@
       <div class="game-over-overlay" id="gameOverOverlay">
         <div class="game-over-title" id="gameOverTitle">GAME OVER</div>
         <div class="game-over-score" id="gameOverScore">Points earned: 0</div>
+        <div class="game-over-target" id="gameOverTarget"></div>
+        <div class="game-over-attempts" id="gameOverAttempts"></div>
         <!-- <div class="game-over-hint">Press SPACE to play again</div> -->
         <button class="game-over-button" id="gameOverButton">
           Play Again <span class="key">_</span>

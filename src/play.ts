@@ -1,4 +1,6 @@
 // Helper to get required DOM elements - fails fast if element is missing
+import type { GameMode, GridCell, Level, Stage } from "./types.js";
+
 function getRequiredElement<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id) as T | null;
   if (!el) throw new Error(`Required element #${id} not found`);
@@ -56,6 +58,8 @@ const gameOverOverlay = getRequiredElement<HTMLDivElement>("gameOverOverlay");
 const gameOverTitle = getRequiredElement<HTMLDivElement>("gameOverTitle");
 const gameOverScore = getRequiredElement<HTMLDivElement>("gameOverScore");
 const gameOverButton = getRequiredElement<HTMLButtonElement>("gameOverButton");
+const gameOverTarget = getRequiredElement<HTMLDivElement>("gameOverTarget");
+const gameOverAttempts = getRequiredElement<HTMLDivElement>("gameOverAttempts");
 
 // Mute button
 const muteButton = document.getElementById("muteButton");
@@ -74,8 +78,7 @@ const GRAVITY = 0.0625;
 // Physics speed multiplier
 const PHYSICS_SPEED = 2.0;
 
-// Game modes
-type GameMode = "timeAttack" | "sprint" | "staged";
+// Game mode constants
 const SPRINT_TARGET_SCORE = 250;
 const TIME_ATTACK_DURATION = 30;
 
@@ -113,6 +116,10 @@ const MAX_TARGET_ROTATION = Math.PI / 8;
 const PLAYER_TILT_FACTOR = 0.05;
 const MAX_PLAYER_TILT = Math.PI / 6;
 
+// Storage keys
+const POLARITY_TARGET_ACHIEVED = "polarity_target_acheived";
+const POLARITY_ATTEMPS = "polarity_attempts";
+
 // Update font-based displays
 function updateFontDisplay(
   element: HTMLSpanElement | null,
@@ -129,20 +136,6 @@ function updateScoreFont(value: number) {
 
 function updateTimerFont(value: number) {
   updateFontDisplay(timerFont, value, 2);
-}
-
-// Stage data structure
-interface StageData {
-  targets: { x: number; y: number }[];
-}
-
-// Level data interface
-interface LevelData {
-  name: string;
-  gameMode?: "timeAttack" | "sprint" | "staged";
-  grid?: string[][];
-  baseGrid?: string[][];
-  stages?: StageData[];
 }
 
 // Type definitions
@@ -272,8 +265,8 @@ let score = 0;
 let particles: Particle[] = [];
 let timeRemaining = 30;
 let isGameOver = false;
+let gameOverProcessed = false;
 let lastTimerUpdate = Date.now();
-let currentGameMode: GameMode = "timeAttack";
 let sprintTimeElapsed = 0;
 
 // Player object
@@ -300,8 +293,7 @@ let targets: Target[] = [];
 let walls: Wall[] = [];
 
 // Current level info
-let currentLevelName: string | null = null;
-let currentLevelData: LevelData | null = null;
+let currentLevelData: Level | null = null;
 let currentPlayStageIndex = 0;
 let totalStages = 0;
 
@@ -527,14 +519,11 @@ bgSynth2.addEventListener("ended", () => {
 // Visibility change handler - pause audio when screen off / tab hidden
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
-    // Suspend Web Audio context (stops all sfx loops)
     audioCtx.suspend();
 
-    // Pause background music
     bgSynth1.pause();
     bgSynth2.pause();
 
-    // Stop any active loops cleanly
     if (blueLoop.playing) {
       blueLoop.playing = false;
       try {
@@ -549,21 +538,16 @@ document.addEventListener("visibilitychange", () => {
       } catch (_) {}
       redLoop.source = null;
     }
-
-    // Reset physics timing to prevent huge delta catch-up
     lastFrameTime = performance.now();
     physicsAccumulatedTime = 0;
     lastTimerUpdate = Date.now();
   } else {
-    // Resume Web Audio context
     audioCtx.resume();
 
-    // Resume background music
     if (bgMusicStarted) {
       playNextBgTrack();
     }
 
-    // Reset physics timing
     lastFrameTime = performance.now();
     physicsAccumulatedTime = 0;
     lastTimerUpdate = Date.now();
@@ -624,57 +608,80 @@ function parseGrid(grid: string[][]) {
   return { playerX, playerY, reds, blues, targs, wallList };
 }
 
-// Normalize level data
+// Normalize level data - merges baseGrid with stage targets
 function normalizeLevelData(
-  levelData: LevelData,
+  levelData: Level,
   stageIndex: number = 0,
 ): string[][] | null {
-  if (levelData.grid) {
-    return levelData.grid;
+  const baseGrid = levelData.baseGrid;
+
+  // For timeAttack and sprint modes, just return baseGrid (no targets to merge)
+  if (levelData.gameMode === "timeAttack" || levelData.gameMode === "sprint") {
+    return baseGrid.map((row) => [...row]);
   }
 
-  if (levelData.baseGrid && levelData.stages && levelData.stages.length > 0) {
-    const baseGrid = levelData.baseGrid;
-    const stage = levelData.stages[stageIndex];
-    if (!stage) return null;
+  // For staged mode, merge with targets from the specified stage
+  const stage = levelData.stages[stageIndex];
+  if (!stage) return null;
 
-    const mergedGrid: string[][] = baseGrid.map((row) => [...row]);
+  const mergedGrid: string[][] = baseGrid.map((row) => [...row]);
 
-    for (const target of stage.targets) {
-      const y = target.y;
-      const x = target.x;
-      if (
-        y !== undefined &&
-        x !== undefined &&
-        y >= 0 &&
-        y < PLAY_GRID_SIZE &&
-        x >= 0 &&
-        x < PLAY_GRID_SIZE
-      ) {
-        const row = mergedGrid[y];
-        if (row) {
-          row[x] = "T";
-        }
+  for (const target of stage.targets) {
+    const y = target.y;
+    const x = target.x;
+    if (
+      y !== undefined &&
+      x !== undefined &&
+      y >= 0 &&
+      y < PLAY_GRID_SIZE &&
+      x >= 0 &&
+      x < PLAY_GRID_SIZE
+    ) {
+      const row = mergedGrid[y];
+      if (row) {
+        row[x] = "T";
       }
     }
-
-    return mergedGrid;
   }
 
-  return null;
+  return mergedGrid;
+}
+
+// Load attempt count from sessionStorage
+function loadAttemptCount(): number {
+  const stored = sessionStorage.getItem(POLARITY_ATTEMPS);
+  if (stored) {
+    const parsed = parseInt(stored, 10);
+    return isNaN(parsed) ? 0 : parsed;
+  }
+  return 0;
+}
+
+// Save attempt count to sessionStorage
+function saveAttemptCount(count: number): void {
+  sessionStorage.setItem(POLARITY_ATTEMPS, count.toString());
+}
+
+// Load target achieved status from sessionStorage
+function loadTargetAchieved(): boolean {
+  const stored = sessionStorage.getItem(POLARITY_TARGET_ACHIEVED);
+  return stored === "true";
+}
+
+// Save target achieved status to sessionStorage
+function saveTargetAchieved(achieved: boolean): void {
+  sessionStorage.setItem(POLARITY_TARGET_ACHIEVED, achieved.toString());
 }
 
 // Load level from data
 function loadLevel(
-  levelData: LevelData,
+  levelData: Level,
   stageIndex: number = 0,
   resetState: boolean = true,
 ) {
   currentLevelData = levelData;
   currentPlayStageIndex = stageIndex;
   totalStages = levelData.stages?.length || 1;
-
-  currentGameMode = levelData.gameMode || "staged";
 
   const grid = normalizeLevelData(levelData, stageIndex);
   if (!grid) {
@@ -685,7 +692,7 @@ function loadLevel(
   if (resetState) {
     score = 0;
     updateScoreFont(0);
-    if (currentGameMode === "sprint" || currentGameMode === "staged") {
+    if (levelData.gameMode === "sprint" || levelData.gameMode === "staged") {
       sprintTimeElapsed = 0;
       updateTimerFont(0);
     } else {
@@ -698,6 +705,7 @@ function loadLevel(
   }
 
   isGameOver = false;
+  gameOverProcessed = false;
   lastTimerUpdate = Date.now();
   particles = [];
   player.hasAttracted = false;
@@ -714,13 +722,11 @@ function loadLevel(
   blueAttractors = blues;
   walls = wallList;
 
-  if (currentGameMode === "timeAttack" || currentGameMode === "sprint") {
+  if (levelData.gameMode === "timeAttack" || levelData.gameMode === "sprint") {
     spawnRandomTargets();
   } else {
     targets = targs;
   }
-
-  currentLevelName = levelData.name;
 }
 
 // Check if target position overlaps with a wall or magnet
@@ -794,44 +800,29 @@ function spawnRandomTargets() {
   }
 }
 
+// Default level data - using new format with baseGrid and stages
+const defaultLevelData: Level = {
+  name: "Default",
+  gameMode: "timeAttack",
+  baseGrid: [
+    [" ", " ", " ", " ", " ", "R"],
+    [" ", " ", " ", " ", " ", " "],
+    [" ", " ", " ", " ", " ", " "],
+    [" ", " ", "B", "P", " ", " "],
+    [" ", " ", " ", " ", " ", " "],
+    [" ", " ", " ", " ", " ", " "],
+  ],
+  stages: [], // Time attack mode doesn't need stages
+  target: 200,
+};
+
 // Default level
 function loadDefaultLevel() {
-  redAttractors = [
-    {
-      x: PLAY_CELL_SIZE * 5 + (PLAY_CELL_SIZE - ATTRACTOR_SIZE) / 2,
-      y: (PLAY_CELL_SIZE - ATTRACTOR_SIZE) / 2,
-    },
-  ];
-
-  blueAttractors = [
-    {
-      x: PLAY_CELL_SIZE * 2 + (PLAY_CELL_SIZE - ATTRACTOR_SIZE) / 2,
-      y: PLAY_CELL_SIZE * 3 + (PLAY_CELL_SIZE - ATTRACTOR_SIZE) / 2,
-    },
-  ];
-
-  player.x = gameCanvas.width / 2 - PLAYER_SIZE / 2;
-  player.y = gameCanvas.height / 2 - PLAYER_SIZE / 2;
-  player.vx = 0;
-  player.vy = 0;
-  player.trail = [];
-  player.hasAttracted = false;
-
-  if (currentGameMode === "sprint" || currentGameMode === "staged") {
-    sprintTimeElapsed = 0;
-    updateTimerFont(0);
-  } else {
-    timeRemaining = TIME_ATTACK_DURATION;
-    updateTimerFont(TIME_ATTACK_DURATION);
-  }
-  isGameOver = false;
-  lastTimerUpdate = Date.now();
-
-  spawnRandomTargets();
+  loadLevel(defaultLevelData, 0, true);
 }
 
 // Load levels from localStorage
-function getStoredLevels(): LevelData[] {
+function getStoredLevels(): Level[] {
   const stored = localStorage.getItem("polarity_levels_v2");
   if (stored) {
     try {
@@ -844,7 +835,7 @@ function getStoredLevels(): LevelData[] {
 }
 
 // Get display name with game mode tag
-function getLevelDisplayName(level: LevelData): string {
+function getLevelDisplayName(level: Level): string {
   const modeTag = level.gameMode ? `[${level.gameMode}]` : "[staged]";
   return `${level.name} ${modeTag}`;
 }
@@ -858,7 +849,8 @@ function checkForEditorLevel() {
       const data = JSON.parse(decoded);
       if (
         data.level &&
-        (data.level.grid || (data.level.baseGrid && data.level.stages))
+        // data.level.baseGrid &&
+        data.level.stages
       ) {
         loadLevel(data.level);
         history.replaceState(null, "", window.location.pathname);
@@ -871,8 +863,8 @@ function checkForEditorLevel() {
   const sessionStorageData = sessionStorage.getItem("polarity_editor_level");
   if (sessionStorageData) {
     try {
-      const level = JSON.parse(sessionStorageData) as LevelData;
-      if (level.grid || (level.baseGrid && level.stages)) {
+      const level = JSON.parse(sessionStorageData) as Level;
+      if (level.stages) {
         loadLevel(level);
         score = 0;
         updateScoreFont(0);
@@ -1135,11 +1127,14 @@ function checkCollisions() {
         // Play collection sound via Web Audio API
         playSfx("eat.ogg", 0.3);
 
-        if (currentGameMode === "sprint" && score >= SPRINT_TARGET_SCORE) {
+        if (
+          currentLevelData.gameMode === "sprint" &&
+          score >= SPRINT_TARGET_SCORE
+        ) {
           isGameOver = true;
         }
 
-        if (currentGameMode === "staged") {
+        if (currentLevelData.gameMode === "staged") {
           const allTargetsInCurrentStageCollected = targets.every(
             (t) => t.collected,
           );
@@ -1169,9 +1164,8 @@ function checkCollisions() {
 
   if (targets.every((t) => t.collected)) {
     if (
-      !currentLevelName ||
-      currentGameMode === "timeAttack" ||
-      currentGameMode === "sprint"
+      currentLevelData.gameMode === "timeAttack" ||
+      currentLevelData.gameMode === "sprint"
     ) {
       spawnRandomTargets();
     } else if (
@@ -1181,7 +1175,7 @@ function checkCollisions() {
     ) {
       currentPlayStageIndex++;
       loadLevel(currentLevelData, currentPlayStageIndex, false);
-    } else if (currentGameMode === "staged") {
+    } else if (currentLevelData.gameMode === "staged") {
       isGameOver = true;
     }
   }
@@ -1434,14 +1428,17 @@ function updateTimer() {
   if (now - lastTimerUpdate >= 1000) {
     lastTimerUpdate += 1000;
 
-    if (currentGameMode === "timeAttack") {
+    if (currentLevelData.gameMode === "timeAttack") {
       timeRemaining--;
       updateTimerFont(timeRemaining);
 
       if (timeRemaining <= 0) {
         isGameOver = true;
       }
-    } else if (currentGameMode === "sprint" || currentGameMode === "staged") {
+    } else if (
+      currentLevelData.gameMode === "sprint" ||
+      currentLevelData.gameMode === "staged"
+    ) {
       sprintTimeElapsed++;
       updateTimerFont(sprintTimeElapsed);
     }
@@ -1450,16 +1447,62 @@ function updateTimer() {
 
 // Show/hide game over overlay
 function drawGameOver() {
-  gameOverOverlay.classList.add("visible");
-  if (currentGameMode === "sprint" || currentGameMode === "staged") {
-    gameOverTitle.textContent = "COMPLETE!";
-  } else {
-    gameOverTitle.textContent = "GAME OVER";
-  }
-  if (currentGameMode === "sprint" || currentGameMode === "staged") {
-    gameOverScore.textContent = `Time: ${sprintTimeElapsed} seconds`;
-  } else {
-    gameOverScore.textContent = `Points earned: ${score}`;
+  if (!gameOverProcessed) {
+    gameOverProcessed = true;
+    gameOverOverlay.classList.add("visible");
+
+    const target = currentLevelData?.target;
+    let targetAchieved = false;
+    let attemptCount = loadAttemptCount();
+    const wasPreviouslyAchieved = loadTargetAchieved();
+
+    if (
+      currentLevelData.gameMode === "sprint" ||
+      currentLevelData.gameMode === "staged"
+    ) {
+      if (target !== undefined) {
+        targetAchieved = sprintTimeElapsed <= target;
+      }
+      gameOverTitle.textContent = "COMPLETE!";
+      gameOverScore.textContent = `Time: ${sprintTimeElapsed} seconds`;
+      if (target !== undefined) {
+        gameOverTarget.textContent = `Target: ${target} seconds`;
+        gameOverTarget.style.color =
+          targetAchieved || wasPreviouslyAchieved
+            ? "var(--neon-cyan)"
+            : "var(--neon-orange)";
+      } else {
+        gameOverTarget.textContent = "";
+      }
+    } else {
+      if (target !== undefined) {
+        targetAchieved = score >= target;
+      }
+      gameOverTitle.textContent = "COMPLETE";
+      gameOverScore.textContent = `Points earned: ${score}`;
+      if (target !== undefined) {
+        gameOverTarget.textContent = `Target: ${target} points`;
+        gameOverTarget.style.color =
+          targetAchieved || wasPreviouslyAchieved
+            ? "var(--neon-cyan)"
+            : "var(--neon-orange)";
+      } else {
+        gameOverTarget.textContent = "";
+      }
+    }
+
+    // Handle attempt count and achievement tracking
+    if (targetAchieved) {
+      // Target achieved: save status and set flag
+      saveTargetAchieved(true);
+    }
+    if (!wasPreviouslyAchieved) {
+      attemptCount++;
+      saveAttemptCount(attemptCount);
+    }
+
+    // Show attempt count
+    gameOverAttempts.textContent = `Attempts: ${attemptCount}`;
   }
 }
 
@@ -1470,30 +1513,12 @@ function hideGameOver() {
 // Restart the game
 function restartGame() {
   isGameOver = false;
+  gameOverProcessed = false;
   lastTimerUpdate = Date.now();
-
-  if (currentGameMode === "sprint" || currentGameMode === "staged") {
-    sprintTimeElapsed = 0;
-    updateTimerFont(0);
-  } else {
-    timeRemaining = TIME_ATTACK_DURATION;
-    updateTimerFont(TIME_ATTACK_DURATION);
-  }
 
   if (checkForEditorLevel()) {
     if (controls && window.getComputedStyle(controls).display === "none") {
       controls.style.display = "flex";
-    }
-    return;
-  }
-
-  if (currentLevelName) {
-    const levels = getStoredLevels();
-    const level = levels.find((l) => l.name === currentLevelName);
-    if (level) {
-      loadLevel(level);
-    } else {
-      loadDefaultLevel();
     }
   } else {
     loadDefaultLevel();

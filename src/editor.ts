@@ -1,4 +1,5 @@
 // Level Editor for Polarity Game
+import type { GridCell, Level, Stage, Tool, GameMode } from "./types.js";
 
 const editorCanvas = document.getElementById(
   "editorCanvas",
@@ -10,11 +11,9 @@ const GRID_SIZE = 6;
 const CELL_SIZE = editorCanvas.width / GRID_SIZE;
 
 // Tool types
-type Tool = "player" | "red" | "blue" | "target" | "wall" | "eraser";
 let currentTool: Tool = "player";
 
 // Letter mapping for grid cells
-type GridCell = " " | "P" | "R" | "B" | "T" | "W";
 const TOOL_TO_LETTER: Record<Tool, GridCell> = {
   player: "P",
   red: "R",
@@ -32,19 +31,6 @@ const LETTER_TO_TOOL: Record<GridCell, Tool | null> = {
   W: "wall",
 };
 
-// Stage data structure - only targets vary per stage
-interface Stage {
-  targets: { x: number; y: number }[];
-}
-
-// Level data structure with multi-stage support
-interface Level {
-  name: string;
-  gameMode: "timeAttack" | "sprint" | "staged";
-  baseGrid: GridCell[][]; // Contains P, R, B, W (no T)
-  stages: Stage[]; // Array of stages, each with target positions
-}
-
 // Must define constants before they are used
 const DEFAULT_STAGE_COUNT = 3;
 
@@ -55,7 +41,7 @@ let currentStageIndex: number = 0;
 // Create a new empty level with default stages
 function createEmptyLevel(
   name: string = "Untitled",
-  gameMode: "timeAttack" | "sprint" | "staged" = "staged",
+  gameMode: GameMode = "staged",
 ): Level {
   // Create empty 6x6 base grid filled with spaces
   const baseGrid: GridCell[][] = [];
@@ -83,6 +69,7 @@ function createEmptyLevel(
     gameMode: gameMode,
     baseGrid: baseGrid,
     stages: stages,
+    target: 0,
   };
 }
 
@@ -434,33 +421,17 @@ function placeObject(gridX: number, gridY: number) {
   }
 
   const letter = TOOL_TO_LETTER[currentTool];
+  const stage = currentLevel.stages[currentStageIndex];
 
-  if (letter === "T") {
-    // Targets go into current stage
-    const stage = currentLevel.stages[currentStageIndex];
-    if (!stage) return;
-
-    // Check if target already exists at this position
-    const existingIndex = stage.targets.findIndex(
-      (t) => t.x === gridX && t.y === gridY,
-    );
-
-    if (existingIndex >= 0) {
-      // Remove target
-      stage.targets.splice(existingIndex, 1);
-    } else {
-      // Add target
-      stage.targets.push({ x: gridX, y: gridY });
-    }
-  } else if (letter === " ") {
-    // Eraser - try to remove from both base and current stage
+  // If using eraser, clear the cell and return
+  if (letter === " ") {
+    // Clear from base grid
     const baseRow = currentLevel.baseGrid[gridY];
     if (baseRow) {
       baseRow[gridX] = " ";
     }
 
-    // Also remove from current stage if it's a target
-    const stage = currentLevel.stages[currentStageIndex];
+    // Remove target from current stage if present
     if (stage) {
       const existingIndex = stage.targets.findIndex(
         (t) => t.x === gridX && t.y === gridY,
@@ -469,23 +440,52 @@ function placeObject(gridX: number, gridY: number) {
         stage.targets.splice(existingIndex, 1);
       }
     }
-  } else {
-    // Player, magnets, walls go into base grid
 
-    // If placing a player, remove any existing player first
-    if (letter === "P") {
-      for (let y = 0; y < GRID_SIZE; y++) {
-        const row = currentLevel.baseGrid[y];
-        if (!row) continue;
-        for (let x = 0; x < GRID_SIZE; x++) {
-          if (row[x] === "P") {
-            row[x] = " ";
-          }
+    updateStats();
+    updateValidationUI();
+    saveLevelToStorage();
+    draw();
+    return;
+  }
+
+  // Clear any existing item at this position (replace behavior)
+  // Clear from base grid
+  const baseRow = currentLevel.baseGrid[gridY];
+  if (baseRow) {
+    baseRow[gridX] = " ";
+  }
+
+  // Remove target from all stages
+  for (const s of currentLevel.stages) {
+    const existingIndex = s.targets.findIndex(
+      (t) => t.x === gridX && t.y === gridY,
+    );
+    if (existingIndex >= 0) {
+      s.targets.splice(existingIndex, 1);
+    }
+  }
+
+  // If placing a player, remove any existing player from other cells first
+  if (letter === "P") {
+    for (let y = 0; y < GRID_SIZE; y++) {
+      const row = currentLevel.baseGrid[y];
+      if (!row) continue;
+      for (let x = 0; x < GRID_SIZE; x++) {
+        if (row[x] === "P") {
+          row[x] = " ";
         }
       }
     }
+  }
 
-    const baseRow = currentLevel.baseGrid[gridY];
+  // Place the new item
+  if (letter === "T") {
+    // Targets go into current stage
+    if (stage) {
+      stage.targets.push({ x: gridX, y: gridY });
+    }
+  } else {
+    // Player, magnets, walls go into base grid
     if (baseRow) {
       baseRow[gridX] = letter;
     }
