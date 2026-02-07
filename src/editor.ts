@@ -638,8 +638,6 @@ function updateStats() {
 
 // New level button
 document.getElementById("newLevelBtn")!.addEventListener("click", () => {
-  // const name = prompt("Enter level name:", "New Level");
-  // if (name) {
   currentLevel = createEmptyLevel("New Level");
   sessionStorage.removeItem(STORAGE_KEY);
   updateTestGameButtonState();
@@ -647,7 +645,6 @@ document.getElementById("newLevelBtn")!.addEventListener("click", () => {
   draw();
   updateStats();
   updateValidationUI();
-  // }
 });
 
 // Test Game button
@@ -695,6 +692,7 @@ document.getElementById("publishBtn")!.addEventListener("click", async () => {
     const result = (await response.json()) as PublishLevelResult;
 
     if (result.success) {
+      sessionStorage.removeItem(STORAGE_KEY);
       navigateTo(result?.postId);
     } else {
       console.error(`Failed to publish: ${result.error}`);
@@ -788,8 +786,6 @@ function updateTestGameButtonState() {
   }
 }
 
-// Initialize
-// Toolbar overflow detection
 function updateToolbarOverflow() {
   const toolbarContainer = document.querySelector(
     ".toolbar-container",
@@ -801,11 +797,9 @@ function updateToolbarOverflow() {
   }
 }
 
-// Check overflow on load and resize
 window.addEventListener("load", updateToolbarOverflow);
 window.addEventListener("resize", updateToolbarOverflow);
 
-// Initialize
 draw();
 updateStats();
 loadLevelFromStorage();
