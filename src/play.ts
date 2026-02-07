@@ -1,5 +1,5 @@
-// Helper to get required DOM elements - fails fast if element is missing
-import type { GameMode, GridCell, Level, Stage } from "./types.js";
+import type { Level } from "./types.js";
+import { context } from "@devvit/web/client";
 
 function getRequiredElement<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id) as T | null;
@@ -800,24 +800,11 @@ function spawnRandomTargets() {
   }
 }
 
-// Default level data - using new format with baseGrid and stages
-const defaultLevelData: Level = {
-  name: "Default",
-  gameMode: "timeAttack",
-  baseGrid: [
-    [" ", " ", " ", " ", " ", "R"],
-    [" ", " ", " ", " ", " ", " "],
-    [" ", " ", " ", " ", " ", " "],
-    [" ", " ", "B", "P", " ", " "],
-    [" ", " ", " ", " ", " ", " "],
-    [" ", " ", " ", " ", " ", " "],
-  ],
-  stages: [], // Time attack mode doesn't need stages
-  target: 200,
-};
-
 // Default level
 function loadDefaultLevel() {
+  const defaultLevelData = JSON.parse(
+    JSON.stringify(context.postData["level"]),
+  );
   loadLevel(defaultLevelData, 0, true);
 }
 

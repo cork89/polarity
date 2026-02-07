@@ -1,5 +1,8 @@
 // Level Editor for Polarity Game
+import { navigateTo } from "@devvit/web/client";
 import type { GridCell, Level, Stage, Tool, GameMode } from "./types.js";
+import { validateLevel } from "./validation.js";
+import { PublishLevelResult } from "./post.js";
 
 const editorCanvas = document.getElementById(
   "editorCanvas",
@@ -101,206 +104,6 @@ function isValidGridPos(gridX: number, gridY: number): boolean {
   return gridX >= 0 && gridX < GRID_SIZE && gridY >= 0 && gridY < GRID_SIZE;
 }
 
-// Find player position in base grid
-function findPlayerPosition(): { x: number; y: number } | null {
-  for (let y = 0; y < GRID_SIZE; y++) {
-    const row = currentLevel.baseGrid[y];
-    if (!row) continue;
-    for (let x = 0; x < GRID_SIZE; x++) {
-      if (row[x] === "P") {
-        return { x, y };
-      }
-    }
-  }
-  return null;
-}
-
-// Find all target positions in current stage
-function findTargetPositions(): { x: number; y: number }[] {
-  const stage = currentLevel.stages[currentStageIndex];
-  if (!stage) return [];
-  return [...stage.targets];
-}
-
-// Check if a target is reachable from the player using BFS
-// A target is reachable if there's a path that doesn't go through walls
-function isTargetReachable(
-  targetX: number,
-  targetY: number,
-  playerPos: { x: number; y: number },
-): boolean {
-  const visited: boolean[][] = [];
-  for (let y = 0; y < GRID_SIZE; y++) {
-    visited.push(new Array(GRID_SIZE).fill(false));
-  }
-
-  const queue: { x: number; y: number }[] = [playerPos];
-  visited[playerPos.y]![playerPos.x] = true;
-
-  const directions = [
-    { dx: 0, dy: -1 }, // up
-    { dx: 0, dy: 1 }, // down
-    { dx: -1, dy: 0 }, // left
-    { dx: 1, dy: 0 }, // right
-  ];
-
-  while (queue.length > 0) {
-    const current = queue.shift()!;
-
-    // Check if we reached the target
-    if (current.x === targetX && current.y === targetY) {
-      return true;
-    }
-
-    // Explore neighbors
-    for (const dir of directions) {
-      const newX = current.x + dir.dx;
-      const newY = current.y + dir.dy;
-
-      if (isValidGridPos(newX, newY)) {
-        const visitedRow = visited[newY];
-        const gridRow = currentLevel.baseGrid[newY];
-
-        if (visitedRow && !visitedRow[newX] && gridRow) {
-          const cell = gridRow[newX];
-          // Can move through empty spaces, attractors, and the player start
-          // Cannot move through walls
-          if (cell !== "W") {
-            visitedRow[newX] = true;
-            queue.push({ x: newX, y: newY });
-          }
-        }
-      }
-    }
-  }
-
-  return false;
-}
-
-// Find all reachable empty squares from player position
-// Returns an array of coordinates for all reachable empty spaces
-function findAllReachableEmptySquares(playerPos: {
-  x: number;
-  y: number;
-}): { x: number; y: number }[] {
-  const visited: boolean[][] = [];
-  for (let y = 0; y < GRID_SIZE; y++) {
-    visited.push(new Array(GRID_SIZE).fill(false));
-  }
-
-  const queue: { x: number; y: number }[] = [playerPos];
-  visited[playerPos.y]![playerPos.x] = true;
-
-  const reachableEmpties: { x: number; y: number }[] = [];
-
-  const directions = [
-    { dx: 0, dy: -1 }, // up
-    { dx: 0, dy: 1 }, // down
-    { dx: -1, dy: 0 }, // left
-    { dx: 1, dy: 0 }, // right
-  ];
-
-  while (queue.length > 0) {
-    const current = queue.shift()!;
-
-    // Check if current position is empty (valid spawn point)
-    const gridRow = currentLevel.baseGrid[current.y];
-    if (gridRow) {
-      const cell = gridRow[current.x];
-      // Empty space is reachable for spawning
-      if (cell === " ") {
-        reachableEmpties.push({ x: current.x, y: current.y });
-      }
-    }
-
-    // Explore neighbors
-    for (const dir of directions) {
-      const newX = current.x + dir.dx;
-      const newY = current.y + dir.dy;
-
-      if (isValidGridPos(newX, newY)) {
-        const visitedRow = visited[newY];
-        const gridRow = currentLevel.baseGrid[newY];
-
-        if (visitedRow && !visitedRow[newX] && gridRow) {
-          const cell = gridRow[newX];
-          // Can move through empty spaces, attractors, and the player start
-          // Cannot move through walls
-          if (cell !== "W") {
-            visitedRow[newX] = true;
-            queue.push({ x: newX, y: newY });
-          }
-        }
-      }
-    }
-  }
-
-  return reachableEmpties;
-}
-
-// Validate level: check if player exists and all stages have reachable targets
-function validateLevel(): { valid: boolean; error: string | null } {
-  const playerPos = findPlayerPosition();
-
-  if (!playerPos) {
-    return { valid: false, error: "No player placed" };
-  }
-
-  // Check for at least one red and one blue magnet
-  let hasRed = false;
-  let hasBlue = false;
-  for (let y = 0; y < GRID_SIZE; y++) {
-    const row = currentLevel.baseGrid[y];
-    if (!row) continue;
-    for (let x = 0; x < GRID_SIZE; x++) {
-      if (row[x] === "R") hasRed = true;
-      if (row[x] === "B") hasBlue = true;
-    }
-  }
-  if (!hasRed) {
-    return { valid: false, error: "At least one red magnet required" };
-  }
-  if (!hasBlue) {
-    return { valid: false, error: "At least one blue magnet required" };
-  }
-
-  // Time Attack and Sprint need at least one reachable empty square
-  // (for auto-spawned targets)
-  if (
-    currentLevel.gameMode === "timeAttack" ||
-    currentLevel.gameMode === "sprint"
-  ) {
-    if (
-      findAllReachableEmptySquares(playerPos).length !==
-      currentLevel.baseGrid.flat().filter((cell) => cell === " ").length
-    ) {
-      return { valid: false, error: "Level can have unreachable target" };
-    }
-    return { valid: true, error: null };
-  }
-
-  // Staged mode requires targets in all stages
-  for (let stageIdx = 0; stageIdx < currentLevel.stages.length; stageIdx++) {
-    const stage = currentLevel.stages[stageIdx];
-    if (!stage) continue;
-
-    if (stage.targets.length === 0) {
-      return { valid: false, error: `Stage ${stageIdx + 1} has no targets` };
-    }
-
-    for (const target of stage.targets) {
-      if (!isTargetReachable(target.x, target.y, playerPos)) {
-        return {
-          valid: false,
-          error: `Stage ${stageIdx + 1} has unreachable target`,
-        };
-      }
-    }
-  }
-
-  return { valid: true, error: null };
-}
-
 // Update editor UI based on game mode
 function updateEditorForGameMode() {
   const targetToolBtn = document.querySelector(
@@ -353,7 +156,7 @@ function updateEditorForGameMode() {
 
 // Update UI based on validation state
 function updateValidationUI() {
-  const validation = validateLevel();
+  const validation = validateLevel(currentLevel);
   const canvas = document.getElementById("editorCanvas") as HTMLCanvasElement;
   const validationMessage = document.getElementById(
     "validationMessage",
@@ -862,8 +665,47 @@ document.getElementById("testGameBtn")!.addEventListener("click", () => {
 });
 
 // Publish button
-document.getElementById("publishBtn")!.addEventListener("click", () => {
-  console.log("published");
+document.getElementById("publishBtn")!.addEventListener("click", async () => {
+  const publishBtn = document.getElementById("publishBtn") as HTMLButtonElement;
+
+  // Client-side validation first
+  const validation = validateLevel(currentLevel);
+  if (!validation.valid) {
+    console.error(`Cannot publish: ${validation.error}`);
+    return;
+  }
+
+  // Disable button during publish
+  const originalText = publishBtn.textContent;
+  publishBtn.disabled = true;
+  publishBtn.textContent = "Publishing...";
+
+  try {
+    const response = await fetch("/api/publish", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        level: currentLevel,
+        levelName: currentLevel.name,
+      }),
+    });
+
+    const result = (await response.json()) as PublishLevelResult;
+
+    if (result.success) {
+      navigateTo(result?.postId);
+    } else {
+      console.error(`Failed to publish: ${result.error}`);
+    }
+  } catch (error) {
+    console.error("Error publishing level:", error);
+  } finally {
+    // Restore button state
+    publishBtn.disabled = false;
+    publishBtn.textContent = originalText;
+  }
 });
 
 // SessionStorage management
