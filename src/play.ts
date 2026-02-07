@@ -1128,13 +1128,13 @@ function checkCollisions() {
         playSfx("eat.ogg", 0.3);
 
         if (
-          currentLevelData.gameMode === "sprint" &&
+          currentLevelData?.gameMode === "sprint" &&
           score >= SPRINT_TARGET_SCORE
         ) {
           isGameOver = true;
         }
 
-        if (currentLevelData.gameMode === "staged") {
+        if (currentLevelData?.gameMode === "staged") {
           const allTargetsInCurrentStageCollected = targets.every(
             (t) => t.collected,
           );
@@ -1164,8 +1164,8 @@ function checkCollisions() {
 
   if (targets.every((t) => t.collected)) {
     if (
-      currentLevelData.gameMode === "timeAttack" ||
-      currentLevelData.gameMode === "sprint"
+      currentLevelData?.gameMode === "timeAttack" ||
+      currentLevelData?.gameMode === "sprint"
     ) {
       spawnRandomTargets();
     } else if (
@@ -1175,7 +1175,7 @@ function checkCollisions() {
     ) {
       currentPlayStageIndex++;
       loadLevel(currentLevelData, currentPlayStageIndex, false);
-    } else if (currentLevelData.gameMode === "staged") {
+    } else if (currentLevelData?.gameMode === "staged") {
       isGameOver = true;
     }
   }
@@ -1428,7 +1428,7 @@ function updateTimer() {
   if (now - lastTimerUpdate >= 1000) {
     lastTimerUpdate += 1000;
 
-    if (currentLevelData.gameMode === "timeAttack") {
+    if (currentLevelData?.gameMode === "timeAttack") {
       timeRemaining--;
       updateTimerFont(timeRemaining);
 
@@ -1436,8 +1436,8 @@ function updateTimer() {
         isGameOver = true;
       }
     } else if (
-      currentLevelData.gameMode === "sprint" ||
-      currentLevelData.gameMode === "staged"
+      currentLevelData?.gameMode === "sprint" ||
+      currentLevelData?.gameMode === "staged"
     ) {
       sprintTimeElapsed++;
       updateTimerFont(sprintTimeElapsed);
@@ -1457,8 +1457,8 @@ function drawGameOver() {
     const wasPreviouslyAchieved = loadTargetAchieved();
 
     if (
-      currentLevelData.gameMode === "sprint" ||
-      currentLevelData.gameMode === "staged"
+      currentLevelData?.gameMode === "sprint" ||
+      currentLevelData?.gameMode === "staged"
     ) {
       if (target !== undefined) {
         targetAchieved = sprintTimeElapsed <= target;

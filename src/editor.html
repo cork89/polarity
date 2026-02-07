@@ -492,6 +492,84 @@
         text-shadow: 0 0 5px var(--neon-cyan-glow);
       }
 
+      .target-input-container {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--gap-md);
+        background: var(--panel-bg);
+        border-radius: var(--radius-lg);
+        padding: var(--padding-md) var(--padding-lg);
+        margin: var(--gap-md) var(--gap-lg) 0 var(--gap-lg);
+        border: 1px solid var(--border-color);
+        box-shadow: 0 0 10px rgba(0, 212, 255, 0.15);
+        flex-shrink: 0;
+      }
+
+      .target-control-group {
+        display: flex;
+        gap: var(--gap-sm);
+      }
+
+      .target-display {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-width: 100px;
+        padding: 0 var(--padding-sm);
+      }
+
+      .target-label {
+        font-size: 11px;
+        color: rgba(224, 224, 255, 0.7);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .target-value {
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--neon-cyan);
+        text-shadow: 0 0 10px var(--neon-cyan-glow);
+        font-family: "Orbitron", sans-serif;
+      }
+
+      .target-btn {
+        padding: var(--padding-sm) 12px;
+        background: var(--panel-bg-light);
+        border: 2px solid transparent;
+        border-radius: var(--radius-md);
+        color: var(--text-color);
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 600;
+        font-family: "Orbitron", sans-serif;
+        transition: var(--transition-fast);
+        min-width: 40px;
+      }
+
+      .target-btn:hover {
+        background: rgba(0, 212, 255, 0.2);
+        border-color: var(--neon-cyan);
+        box-shadow: var(--shadow-cyan);
+      }
+
+      .target-btn:active {
+        transform: scale(0.95);
+      }
+
+      .target-btn-decrease:hover {
+        background: rgba(255, 107, 53, 0.2);
+        border-color: var(--neon-orange);
+        box-shadow: 0 0 10px var(--neon-orange-glow);
+      }
+
+      .target-btn-increase:hover {
+        background: rgba(76, 175, 80, 0.2);
+        border-color: #4caf50;
+        box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+      }
+
       .level-info-compact {
         background: var(--panel-bg-light);
         border: 1px solid var(--border-color);
@@ -525,7 +603,8 @@
       /* Responsive adjustments */
       @media (min-width: 600px) {
         .stage-selector,
-        .game-mode-description {
+        .game-mode-description,
+        .target-input-container {
           max-width: 600px;
           margin-left: auto;
           margin-right: auto;
@@ -557,6 +636,22 @@
     <!-- Game Mode Description -->
     <div class="game-mode-description" id="gameModeDescription">
       Complete 3 stages by collecting all targets in each stage
+    </div>
+
+    <!-- Target Input -->
+    <div class="target-input-container" id="targetInputContainer">
+      <div class="target-control-group">
+        <button class="target-btn target-btn-decrease" data-amount="-10">-10</button>
+        <button class="target-btn target-btn-decrease" data-amount="-5">-5</button>
+      </div>
+      <div class="target-display">
+        <span class="target-label" id="targetLabel">Target Score:</span>
+        <span class="target-value" id="targetValue">0</span>
+      </div>
+      <div class="target-control-group">
+        <button class="target-btn target-btn-increase" data-amount="5">+5</button>
+        <button class="target-btn target-btn-increase" data-amount="10">+10</button>
+      </div>
     </div>
 
     <!-- Stage Selector -->

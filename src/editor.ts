@@ -337,6 +337,14 @@ function updateEditorForGameMode() {
     if (targetCountEl) targetCountEl.style.display = "flex";
   }
 
+  // Re-clamp target value when switching game modes and save to storage
+  const clampedValue = clampTargetValue(currentLevel.target);
+  if (clampedValue !== currentLevel.target) {
+    currentLevel.target = clampedValue;
+    saveLevelToStorage();
+  }
+
+  updateTargetInputUI();
   draw();
   updateStats();
   updateValidationUI();
@@ -756,6 +764,14 @@ document.getElementById("gameModeSelect")?.addEventListener("change", (e) => {
   updateEditorForGameMode();
 });
 
+// Target button click handlers
+document.querySelectorAll(".target-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const amount = parseInt(btn.getAttribute("data-amount") || "0", 10);
+    handleTargetButtonClick(amount);
+  });
+});
+
 // Update stage selector UI
 function updateStageSelector() {
   document.querySelectorAll(".stage-btn").forEach((btn) => {
@@ -852,6 +868,49 @@ document.getElementById("publishBtn")!.addEventListener("click", () => {
 
 // SessionStorage management
 const STORAGE_KEY = "polarity_editor_level";
+
+// Target input management
+const TARGET_MAX_SCORE = 300;
+const TARGET_MAX_TIME = 120;
+
+function getTargetMax(): number {
+  return currentLevel.gameMode === "timeAttack"
+    ? TARGET_MAX_SCORE
+    : TARGET_MAX_TIME;
+}
+
+function getTargetLabel(): string {
+  return currentLevel.gameMode === "timeAttack"
+    ? "Target Score:"
+    : "Target Time:";
+}
+
+function updateTargetInputUI() {
+  const targetLabel = document.getElementById("targetLabel");
+  const targetValue = document.getElementById("targetValue");
+
+  if (targetLabel) {
+    targetLabel.textContent = getTargetLabel();
+  }
+
+  if (targetValue) {
+    targetValue.textContent = String(currentLevel.target);
+  }
+}
+
+function clampTargetValue(value: number): number {
+  const max = getTargetMax();
+  if (value < 0) return 0;
+  if (value > max) return max;
+  return value;
+}
+
+function handleTargetButtonClick(amount: number) {
+  const newValue = currentLevel.target + amount;
+  currentLevel.target = clampTargetValue(newValue);
+  updateTargetInputUI();
+  saveLevelToStorage();
+}
 
 function saveLevelToStorage() {
   sessionStorage.setItem(STORAGE_KEY, JSON.stringify(currentLevel));
