@@ -1,4 +1,4 @@
-import type { Level } from "./types.js";
+import type { Level } from "./shared";
 import { context } from "@devvit/web/client";
 
 function getRequiredElement<T extends HTMLElement>(id: string): T {
@@ -87,7 +87,7 @@ const COLOR_BACKGROUND = "#0a1628";
 const COLOR_GRID = "#00d4ff";
 const COLOR_PLAYER_OUTER = "#666";
 const COLOR_PLAYER_INNER = "#7d7d7dff";
-const COLOR_PLAYER_TRAIL = "rgba(150, 150, 150, 0.3)";
+const COLOR_PLAYER_TRAIL = "rgba(150, 150, 150";
 const COLOR_RED_ATTRACTOR_OUTER = "#ff2a6d";
 const COLOR_RED_ATTRACTOR_INNER = "#ff5c8d";
 const COLOR_BLUE_ATTRACTOR_OUTER = "#05d9e8";
@@ -319,6 +319,7 @@ async function loadAudioBuffer(url: string): Promise<AudioBuffer> {
     return await audioCtx.decodeAudioData(arrayBuffer);
   }
 }
+
 async function preloadSounds(): Promise<void> {
   const soundFiles = ["electric1.ogg", "electric2.ogg", "eat.ogg"];
 
@@ -1333,7 +1334,7 @@ function drawPlayer(interpolationFactor: number = 0) {
   const trailWidth = player.size * TRAIL_WIDTH_RATIO;
   const trailOffsetX = (player.size - trailWidth) / 2;
   player.trail.forEach((t) => {
-    gameCtx.fillStyle = `rgba(150, 150, 150, ${t.alpha * 0.3})`;
+    gameCtx.fillStyle = `${COLOR_PLAYER_TRAIL}, ${t.alpha * 0.3})`;
     gameCtx.fillRect(t.x + trailOffsetX, t.y, trailWidth, player.size);
   });
 

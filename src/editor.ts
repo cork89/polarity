@@ -1,8 +1,14 @@
 // Level Editor for Polarity Game
 import { navigateTo } from "@devvit/web/client";
-import type { GridCell, Level, Stage, Tool, GameMode } from "./types.js";
-import { validateLevel } from "./validation.js";
-import { PublishLevelResult } from "./post.js";
+import {
+  type GridCell,
+  type Level,
+  type Stage,
+  type Tool,
+  type GameMode,
+  validateLevel,
+  PublishLevelResult,
+} from "./shared";
 
 const editorCanvas = document.getElementById(
   "editorCanvas",

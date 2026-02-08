@@ -1,4 +1,28 @@
-import type { Level, GridCell } from "./types.js";
+// Shared types for Polarity Game
+
+export type Tool = "player" | "red" | "blue" | "target" | "wall" | "eraser";
+
+export type GridCell = " " | "P" | "R" | "B" | "T" | "W";
+
+export type GameMode = "timeAttack" | "sprint" | "staged";
+
+export interface Stage {
+  targets: { x: number; y: number }[];
+}
+
+export interface Level {
+  name: string;
+  gameMode: GameMode;
+  baseGrid: GridCell[][];
+  stages: Stage[];
+  target: number; // Points for timeAttack, seconds for sprint/staged
+}
+
+export interface PublishLevelResult {
+  success: boolean;
+  postId?: string;
+  error?: string;
+}
 
 const GRID_SIZE = 6;
 
@@ -152,10 +176,7 @@ export function validateLevel(level: Level): ValidationResult {
     return { valid: false, error: "At least one blue magnet required" };
   }
 
-  if (
-    level.gameMode === "timeAttack" ||
-    level.gameMode === "sprint"
-  ) {
+  if (level.gameMode === "timeAttack" || level.gameMode === "sprint") {
     if (
       findAllReachableEmptySquares(level, playerPos).length !==
       level.baseGrid.flat().filter((cell) => cell === " ").length

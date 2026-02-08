@@ -2,9 +2,8 @@ import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { context, createServer, getServerPort } from "@devvit/web/server";
 import { createPost, publishLevel } from "./post";
-import { validateLevel } from "./validation";
 import type { OnAppInstallRequest, TriggerResponse } from "@devvit/web/shared";
-import type { Level } from "./types";
+import { validateLevel, type Level } from "./shared";
 
 const app = new Hono();
 

@@ -1,8 +1,8 @@
 import { reddit } from "@devvit/web/server";
-import type { GameMode, Level } from "./types.js";
+import type { GameMode, Level, PublishLevelResult } from "./shared";
 import type { JSONObject } from "@devvit/public-api";
 
-export const defaultLevelData: Level = {
+const defaultLevelData: Level = {
   name: "Default",
   gameMode: "timeAttack",
   baseGrid: [
@@ -26,12 +26,6 @@ export const createPost = async () => {
     } as JSONObject,
   });
 };
-
-export interface PublishLevelResult {
-  success: boolean;
-  postId?: string;
-  error?: string;
-}
 
 const gameModeMap: Record<GameMode, string> = {
   timeAttack: "Time Attack",
